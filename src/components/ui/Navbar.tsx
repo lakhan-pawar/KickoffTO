@@ -1,94 +1,104 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useState, useEffect } from 'react'
 
-const NAV_LINKS = [
-  { href: '/', label: 'Home' },
+const NAV = [
+  { href: '/',           label: 'Home' },
   { href: '/characters', label: 'Characters' },
-  { href: '/live', label: 'Live' },
-  { href: '/games', label: 'Games' },
-  { href: '/story', label: 'Story' },
-  { href: '/history', label: 'History' },
+  { href: '/live',       label: 'Live' },
+  { href: '/games',      label: 'Games' },
+  { href: '/story',      label: 'Story' },
+  { href: '/history',    label: 'History' },
 ]
 
-interface NavbarProps {
-  isLive?: boolean
-}
-
-export function Navbar({ isLive = false }: NavbarProps) {
+export function Navbar({ isLive }: { isLive?: boolean } = {}) {
   const pathname = usePathname()
-  const [theme, setTheme] = useState<'dark' | 'light'>('dark')
+  const [dark, setDark] = useState(true)
+  const [scrolled, setScrolled] = useState(false)
 
   useEffect(() => {
-    const saved = localStorage.getItem('kt-theme') as 'dark' | 'light' | null
-    const sys = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
-    const t = saved ?? sys
-    setTheme(t)
-    document.documentElement.className = t
+    const stored = localStorage.getItem('kt-theme')
+    const isDark = stored !== 'light'
+    setDark(isDark)
+    document.documentElement.className = isDark ? 'dark' : 'light'
   }, [])
 
-  function toggleTheme() {
-    const next = theme === 'dark' ? 'light' : 'dark'
-    setTheme(next)
-    document.documentElement.className = next
-    localStorage.setItem('kt-theme', next)
+  useEffect(() => {
+    const fn = () => setScrolled(window.scrollY > 4)
+    window.addEventListener('scroll', fn, { passive: true })
+    return () => window.removeEventListener('scroll', fn)
+  }, [])
+
+  function toggle() {
+    const next = !dark
+    setDark(next)
+    document.documentElement.className = next ? 'dark' : 'light'
+    localStorage.setItem('kt-theme', next ? 'dark' : 'light')
   }
 
   return (
-    <nav style={{
-      position: 'sticky', top: 0, zIndex: 100, height: 64,
-      background: 'var(--bg-card)', borderBottom: '1px solid var(--border)',
-      display: 'flex', alignItems: 'center', padding: '0 20px', gap: 20,
+    <header style={{
+      position: 'sticky', top: 0, zIndex: 200,
+      background: scrolled ? 'rgba(8,8,8,0.97)' : 'rgba(8,8,8,0.8)',
+      backdropFilter: 'blur(24px)',
+      WebkitBackdropFilter: 'blur(24px)',
+      borderBottom: `1px solid ${scrolled ? 'rgba(255,255,255,0.07)' : 'transparent'}`,
+      transition: 'all 0.2s',
     }}>
-      {/* Logo */}
-      <Link href="/" style={{
-        fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 18,
-        color: 'var(--green)', letterSpacing: -0.3, textDecoration: 'none',
-        flexShrink: 0,
+      <div style={{
+        maxWidth: 1280, margin: '0 auto',
+        padding: '0 14px', height: 52,
+        display: 'flex', alignItems: 'center', gap: 6,
       }}>
-        KickoffTo
-      </Link>
-
-      {/* Desktop nav links */}
-      <div style={{ display: 'flex', gap: 4, flex: 1, justifyContent: 'center' }}
-           className="hidden md:flex">
-        {NAV_LINKS.map(link => (
-          <Link key={link.href} href={link.href} style={{
-            padding: '6px 12px', borderRadius: 8, fontSize: 13, fontWeight: 500,
-            color: pathname === link.href ? 'var(--green)' : 'var(--text-2)',
-            textDecoration: 'none',
-            background: pathname === link.href ? 'var(--bg-elevated)' : 'transparent',
-          }}>
-            {link.label}
-          </Link>
-        ))}
-      </div>
-
-      {/* Right side */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginLeft: 'auto' }}>
-        {isLive && (
+        {/* Logo mark */}
+        <Link href="/" style={{ textDecoration: 'none', flexShrink: 0, marginRight: 10 }}>
           <div style={{
-            display: 'flex', alignItems: 'center', gap: 4,
-            background: 'var(--green)', color: '#fff',
-            fontSize: 10, fontWeight: 700, padding: '3px 9px', borderRadius: 99,
+            width: 32, height: 32, borderRadius: 9,
+            background: 'linear-gradient(135deg, #16a34a 0%, #0d7a35 100%)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 0 16px rgba(22,163,74,0.45)',
+            fontFamily: 'var(--font-display)', fontWeight: 900,
+            fontSize: 13, color: '#fff', letterSpacing: -0.5,
           }}>
-            <span className="animate-live" style={{
-              width: 5, height: 5, borderRadius: '50%', background: '#fff',
-              display: 'inline-block',
-            }} />
-            Live
+            KT
           </div>
-        )}
-        <button onClick={toggleTheme} style={{
-          width: 36, height: 36, borderRadius: 8,
-          border: '1px solid var(--border)', background: 'var(--bg-elevated)',
-          color: 'var(--text-2)', fontSize: 16, cursor: 'pointer',
+        </Link>
+
+        {/* Nav */}
+        <nav style={{
+          flex: 1, display: 'flex', gap: 1,
+          overflowX: 'auto', scrollbarWidth: 'none',
+        }}>
+          {NAV.map(({ href, label }) => {
+            const active = href === '/' ? pathname === '/' : pathname?.startsWith(href)
+            return (
+              <Link key={href} href={href} style={{ textDecoration: 'none', flexShrink: 0 }}>
+                <div style={{
+                  padding: '7px 11px', borderRadius: 9,
+                  fontSize: 13, fontWeight: active ? 600 : 400,
+                  color: active ? '#fff' : 'var(--text-3)',
+                  background: active ? 'rgba(22,163,74,0.18)' : 'transparent',
+                  border: `1px solid ${active ? 'rgba(22,163,74,0.3)' : 'transparent'}`,
+                  transition: 'all 0.15s',
+                  whiteSpace: 'nowrap',
+                }}>
+                  {label}
+                </div>
+              </Link>
+            )
+          })}
+        </nav>
+
+        <button onClick={toggle} style={{
+          width: 34, height: 34, borderRadius: 9, flexShrink: 0,
+          background: 'var(--bg-elevated)', border: '1px solid var(--border)',
+          color: 'var(--text-2)', cursor: 'pointer', fontSize: 14,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
-          {theme === 'dark' ? '☀' : '☾'}
+          {dark ? '☀' : '🌙'}
         </button>
       </div>
-    </nav>
+    </header>
   )
 }

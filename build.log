@@ -1,0 +1,111 @@
+﻿
+> kickoffto@0.1.0 build
+> next build
+
+Γû▓ Next.js 16.2.1 (Turbopack)
+- Environments: .env.local
+- Experiments (use with caution):
+  ┬╖ serverActions
+
+  Creating an optimized production build ...
+Γ£ô Compiled successfully in 2.9s
+  Running TypeScript ...
+  Finished TypeScript in 3.1s ...
+  Collecting page data using 11 workers ...
+node.exe : ΓÜá Using edge runtime on a page currently 
+disables static generation for that page
+At line:1 char:1
++ & "C:\Program Files\nodejs/node.exe" "C:\Program 
+Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (ΓÜá Using edge  
+   ...n for that page:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  Generating static pages using 11 workers (0/101) ...
+  Generating static pages using 11 workers (25/101) 
+  Generating static pages using 11 workers (50/101) 
+  Generating static pages using 11 workers (75/101) 
+Γ£ô Generating static pages using 11 workers (101/101) in 857ms
+  Finalizing page optimization ...
+
+Route (app)                             Revalidate  Expire
+Γöî Γùï /                                          30s      1y
+Γö£ Γùï /_not-found
+Γö£ Γùï /analyse
+Γö£ ╞Æ /api/analyse/screenshot
+Γö£ ╞Æ /api/cards/[playerId]/description
+Γö£ ╞Æ /api/cards/[playerId]/photo
+Γö£ ╞Æ /api/characters/[id]/chat
+Γö£ Γùï /api/characters/council
+Γö£ ╞Æ /api/debug/keys
+Γö£ ╞Æ /api/director/[matchId]/generate
+Γö£ ╞Æ /api/games/chant
+Γö£ ╞Æ /api/games/chaos-narrative
+Γö£ ╞Æ /api/games/trivia
+Γö£ ╞Æ /api/h2h/narrative
+Γö£ ╞Æ /api/live/[matchId]/events
+Γö£ ╞Æ /api/live/[matchId]/goal-explainer
+Γö£ ╞Æ /api/live/[matchId]/radio
+Γö£ ╞Æ /api/live/[matchId]/reactions
+Γö£ ╞Æ /api/live/current
+Γö£ ╞Æ /api/proxy/image
+Γö£ ╞Æ /api/pulse/social
+Γö£ ╞Æ /api/push/notify
+Γö£ ╞Æ /api/radio/generate
+Γö£ ╞Æ /api/schedule
+Γö£ ╞Æ /api/story/generate
+Γö£ ╞Æ /api/vapid
+Γö£ ╞Æ /api/wrapped/generate
+Γö£ Γùï /cards
+Γö£ ╞Æ /cards/[playerId]
+Γö£ ╞Æ /characters
+Γö£ ╞Æ /characters/[id]
+Γö£ ╞Æ /characters/-/opengraph-image
+Γö£ Γùï /characters/council
+Γö£ Γùï /director
+Γö£ ╞Æ /director/[matchId]
+Γö£ Γùï /games
+Γö£ Γùï /games/bracket
+Γö£ Γùï /games/chant
+Γö£ Γùï /games/chaos
+Γö£ Γùï /games/predict
+Γö£ Γùï /games/trivia
+Γö£ Γùï /groups                                     5m      1y
+Γö£ Γùï /h2h
+Γö£ Γùï /heatwave
+Γö£ Γùï /history
+Γö£ ΓùÅ /history/[year]
+Γöé Γö£ /history/1930
+Γöé Γö£ /history/1934
+Γöé Γö£ /history/1938
+Γöé Γöö [+20 more paths]
+Γö£ Γùï /journal
+Γö£ Γùï /live
+Γö£ ╞Æ /live/[matchId]
+Γö£ Γùï /more
+Γö£ Γùï /players
+Γö£ ╞Æ /players/[id]
+Γö£ ╞Æ /preview/[matchId]
+Γö£ Γùï /privacy
+Γö£ Γùï /pulse
+Γö£ Γùï /radio
+Γö£ Γùï /schedule
+Γö£ ╞Æ /share/character/[characterId]
+Γö£ ╞Æ /share/match/[matchId]
+Γö£ Γùï /story                                      1h      1y
+Γö£ ╞Æ /story/[chapter]
+Γö£ Γùï /teams
+Γö£ ΓùÅ /teams/[code]
+Γöé Γö£ /teams/usa
+Γöé Γö£ /teams/pan
+Γöé Γö£ /teams/alb
+Γöé Γöö [+45 more paths]
+Γöö Γùï /wrapped
+
+
+Γùï  (Static)   prerendered as static content
+ΓùÅ  (SSG)      prerendered as static HTML (uses generateStaticParams)
+╞Æ  (Dynamic)  server-rendered on demand
+
