@@ -2,6 +2,7 @@
 import type { Match } from '@/types'
 import { useState } from 'react'
 import { WatchLiveSheet } from '@/components/live/WatchLiveSheet'
+import { CanadaWatermark, isCanadaMatch } from '@/components/ui/CanadaMatchCard'
 
 interface MatchCardProps {
   match: Match
@@ -19,6 +20,11 @@ export function MatchCard({ match, variant = 'default', showButtons = true, onPr
   const scoreSize = match.intensity === 'historic' ? 52
     : match.intensity === 'big' ? 44 : 36
 
+  const canadaMatch = isCanadaMatch(
+    match.homeTeam.code ?? '',
+    match.awayTeam.code ?? ''
+  )
+
   function formatCountdown(kickoff: string): string {
     const diff = new Date(kickoff).getTime() - Date.now()
     if (diff <= 0) return 'Starting soon'
@@ -31,14 +37,22 @@ export function MatchCard({ match, variant = 'default', showButtons = true, onPr
   }
 
   return (
-    <div style={{
-      background: 'var(--bg-card)',
-      border: '1px solid var(--border)',
-      borderLeft: isLive ? '3px solid var(--green)' : '1px solid var(--border)',
-      borderRadius: isLive ? '0 12px 12px 0' : 12,
-      overflow: 'hidden',
-      position: 'relative',
-    }}>
+    <div 
+      className={canadaMatch ? 'canada-home-match' : ''}
+      data-intensity={
+        match.intensity === 'historic' ? 'historic' :
+        match.intensity === 'big' ? 'big' : 'normal'
+      }
+      style={{
+        background: 'var(--bg-card)',
+        border: '1px solid var(--border)',
+        borderLeft: isLive ? '3px solid var(--green)' : '1px solid var(--border)',
+        borderRadius: isLive ? '0 12px 12px 0' : 12,
+        overflow: 'hidden',
+        position: 'relative',
+      }}
+    >
+      {canadaMatch && <CanadaWatermark opacity={0.02} />}
       {/* Ghost flag */}
       <div style={{
         position: 'absolute', right: -8, top: -8,

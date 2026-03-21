@@ -332,8 +332,8 @@ export default async function HomePage() {
 
       </main>
 
-      {/* MiniPlayer — show if live match exists */}
-      <MiniPlayer match={liveMatches[0] ?? null} />
+      {/* MiniPlayer — handles own visibility/fetching */}
+      <MiniPlayer />
 
       {/* Bottom nav (mobile) */}
       <BottomNav />

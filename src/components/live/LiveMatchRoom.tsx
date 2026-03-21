@@ -171,8 +171,8 @@ export function LiveMatchRoom({ match }: LiveMatchRoomProps) {
         </div>
       )}
 
-      {/* Mini player */}
-      <MiniPlayer match={liveMatch.status === 'live' ? liveMatch : null} />
+      {/* Mini player — handles own visibility/fetching */}
+      <MiniPlayer />
     </div>
   )
 }

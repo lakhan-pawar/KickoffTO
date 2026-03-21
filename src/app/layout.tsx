@@ -27,11 +27,14 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 }
 
+import { MiniPlayer } from '@/components/ui/MiniPlayer'
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
       <body className={`${bricolage.variable} ${dmSans.variable} font-body bg-page text-primary antialiased`}>
         {children}
+        <MiniPlayer />
       </body>
     </html>
   )
