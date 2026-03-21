@@ -68,6 +68,15 @@ const GAMES = [
   { href: '/characters/council',emoji: '⚡', name: 'Council',    color: '#9333ea' },
 ]
 
+const GAME_STATS: Record<string, string> = {
+  '/games/predict':     '4.2k predictions made',
+  '/games/trivia':      '891 played today',
+  '/games/chaos':       '2.1k timelines explored',
+  '/games/dream-squad': '1.3k squads built',
+  '/games/chant':       '567 chants created',
+  '/characters/council':'234 council sessions',
+}
+
 const PHASE1 = CHARACTERS.filter(c => c.phase === 1)
 
 export default function HomePage() {
@@ -83,7 +92,7 @@ export default function HomePage() {
       <main style={{ maxWidth: 1200, margin: '0 auto', padding: '0 14px 72px' }}>
 
         {/* ── HERO countdown ─────────────────────────────── */}
-        <section style={{
+        <section className="hero-atmosphere" style={{
           padding: '20px 0 16px',
           background: 'radial-gradient(ellipse 80% 60% at 50% 0%, rgba(22,163,74,0.12) 0%, transparent 70%)',
           marginBottom: 4,
@@ -248,6 +257,12 @@ export default function HomePage() {
                   }}>
                     {game.name}
                   </span>
+                  <span style={{
+                    fontSize: 10, color: 'rgba(255,255,255,0.45)',
+                    marginTop: 2,
+                  }}>
+                    {GAME_STATS[game.href] ?? ''}
+                  </span>
                 </div>
               </Link>
             ))}
@@ -291,13 +306,59 @@ export default function HomePage() {
         </section>
 
         {/* Footer */}
-        <p style={{
-          fontSize: 11, color: 'var(--text-3)', textAlign: 'center',
-          padding: '16px 0',
+        <footer style={{
+          padding: '20px 0 8px',
+          borderTop: '1px solid var(--border)',
+          marginTop: 8,
         }}>
-          Unofficial fan app · Not affiliated with FIFA ·{' '}
-          <Link href="/privacy" style={{ color: 'var(--text-3)' }}>Privacy</Link>
-        </p>
+          {/* Social links */}
+          <div style={{
+            display: 'flex', justifyContent: 'center', gap: 16, marginBottom: 12,
+          }}>
+            {[
+              { label: 'Bluesky', href: 'https://bsky.app/profile/kickoffto.com', icon: '🦋' },
+              { label: 'X', href: 'https://x.com/kickoffto', icon: '✕' },
+              { label: 'TikTok', href: 'https://tiktok.com/@kickoffto', icon: '♪' },
+            ].map(social => (
+              <a
+                key={social.label}
+                href={social.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={`KickoffTo on ${social.label}`}
+                className="social-link"
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 5,
+                  fontSize: 12, color: 'var(--text-3)',
+                  textDecoration: 'none',
+                  padding: '5px 10px', borderRadius: 8,
+                  border: '1px solid var(--border)',
+                  background: 'var(--bg-elevated)',
+                  transition: 'color 0.15s, border-color 0.15s',
+                }}
+              >
+                <span>{social.icon}</span>
+                <span>{social.label}</span>
+              </a>
+            ))}
+          </div>
+
+          {/* Legal */}
+          <p style={{
+            fontSize: 11, color: 'var(--text-3)', textAlign: 'center',
+            lineHeight: 1.6,
+          }}>
+            Unofficial fan app · Not affiliated with FIFA ·{' '}
+            <Link href="/privacy" style={{ color: 'var(--text-3)' }}>Privacy</Link>
+            {' · '}
+            <a
+              href="mailto:hello@kickoffto.com"
+              style={{ color: 'var(--text-3)', textDecoration: 'none' }}
+            >
+              Feedback
+            </a>
+          </p>
+        </footer>
       </main>
       <BottomNav />
     </>

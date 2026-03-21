@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { Navbar } from '@/components/ui/Navbar'
 import { BottomNav } from '@/components/ui/BottomNav'
+import { useToast } from '@/components/ui/Toast'
 import Link from 'next/link'
 
 const MATCHES = [
@@ -20,6 +21,7 @@ interface Prediction {
 export default function PredictPage() {
   const [predictions, setPredictions] = useState<Record<string, Prediction>>({})
   const [saved, setSaved] = useState(false)
+  const { showToast } = useToast()
 
   useEffect(() => {
     const stored = localStorage.getItem('kt-predictions')
@@ -41,6 +43,8 @@ export default function PredictPage() {
 
   function savePredictions() {
     localStorage.setItem('kt-predictions', JSON.stringify(predictions))
+    if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([10, 30, 10])
+    showToast('Predictions saved! ✓', 'success', '🎯')
     setSaved(true)
     setTimeout(() => setSaved(false), 2500)
   }

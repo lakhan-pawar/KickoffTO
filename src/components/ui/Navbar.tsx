@@ -90,12 +90,17 @@ export function Navbar({ isLive }: { isLive?: boolean } = {}) {
           })}
         </nav>
 
-        <button onClick={toggle} style={{
-          width: 34, height: 34, borderRadius: 9, flexShrink: 0,
-          background: 'var(--bg-elevated)', border: '1px solid var(--border)',
-          color: 'var(--text-2)', cursor: 'pointer', fontSize: 14,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
+        <button
+          onClick={toggle}
+          aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+          title={dark ? 'Light mode' : 'Dark mode'}
+          style={{
+            width: 34, height: 34, borderRadius: 9, flexShrink: 0,
+            background: 'var(--bg-elevated)', border: '1px solid var(--border)',
+            color: 'var(--text-2)', cursor: 'pointer', fontSize: 14,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >
           {dark ? '☀' : '🌙'}
         </button>
       </div>

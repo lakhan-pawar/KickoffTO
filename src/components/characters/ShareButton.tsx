@@ -1,13 +1,17 @@
 'use client'
 import { useState } from 'react'
+import { useToast } from '@/components/ui/Toast'
 
 export function ShareButton({ characterId }: { characterId: string }) {
   const [copied, setCopied] = useState(false)
+  const { showToast } = useToast()
 
   async function handleShare() {
     const url = `${window.location.origin}/characters/${characterId}`
     try {
       await navigator.clipboard.writeText(url)
+      if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(8)
+      showToast('Link copied!', 'success', '🔗')
       setCopied(true)
       setTimeout(() => setCopied(false), 2500)
     } catch {

@@ -199,7 +199,10 @@ export function ChatPanel({ character, compact }: ChatPanelProps) {
             }}
           />
           <button
-            onClick={handleSubmit as any}
+            onClick={e => {
+              if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(6)
+              handleSubmit(e as any)
+            }}
             disabled={isLoading || !input.trim()}
             style={{
               width: 44, height: 44, borderRadius: '50%', flexShrink: 0,
@@ -440,7 +443,10 @@ export function ChatPanel({ character, compact }: ChatPanelProps) {
           onBlur={e => { e.currentTarget.style.borderColor = 'var(--border)' }}
         />
         <button
-          onClick={handleSubmit as any}
+          onClick={e => {
+            if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(6)
+            handleSubmit(e as any)
+          }}
           disabled={isLoading || !input.trim()}
           style={{
             background: 'var(--green)', color: '#fff', border: 'none',

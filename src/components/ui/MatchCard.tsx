@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import Link from 'next/link'
+import { formatMatchTime } from '@/lib/timezone'
 
 interface TeamInfo {
   name: string; shortName?: string; flag: string
@@ -34,14 +35,25 @@ export function MatchCard({ match }: MatchCardProps) {
   const homeKit = match.homeTeam.kitColors?.home[0] ?? '#888'
   const awayKit = match.awayTeam.kitColors?.home[0] ?? '#555'
   const countdown = timeUntil(match.kickoff)
+  const timeInfo = match.kickoff ? formatMatchTime(match.kickoff) : null
 
   return (
     <div style={{
       position: 'relative', borderRadius: 16, overflow: 'hidden',
       background: 'var(--bg-card)', border: '1px solid var(--border)',
-      minWidth: 200,
+      minWidth: 200, transition: 'transform 0.15s, box-shadow 0.15s'
     }}
-    data-intensity={match.intensity ?? 'normal'}>
+    data-intensity={match.intensity ?? 'normal'}
+    onMouseEnter={e => {
+      const el = e.currentTarget as HTMLDivElement
+      el.style.transform = 'translateY(-3px)'
+      el.style.boxShadow = '0 8px 24px rgba(0,0,0,0.3)'
+    }}
+    onMouseLeave={e => {
+      const el = e.currentTarget as HTMLDivElement
+      el.style.transform = 'none'
+      el.style.boxShadow = 'none'
+    }}>
 
       {/* Kit colour band — THICK and vivid */}
       <div style={{ height: 6, display: 'flex' }}>
@@ -80,7 +92,7 @@ export function MatchCard({ match }: MatchCardProps) {
             {match.round}
           </span>
           {isLive ? (
-            <span className="pill pill-live">
+            <span className="match-badge live">
               <span style={{
                 width: 5, height: 5, borderRadius: '50%', background: '#f87171',
                 animation: 'livePulse 1.2s ease-in-out infinite',
@@ -89,11 +101,9 @@ export function MatchCard({ match }: MatchCardProps) {
               {match.minute}&apos; LIVE
             </span>
           ) : isFinished ? (
-            <span className="pill pill-dim">FT</span>
-          ) : countdown ? (
-            <span style={{ fontSize: 11, color: 'var(--green)', fontWeight: 600 }}>
-              {countdown}
-            </span>
+            <span className="match-badge finished">FT</span>
+          ) : timeInfo ? (
+            <span className="match-badge upcoming">{timeInfo.relative}</span>
           ) : null}
         </div>
 
@@ -144,6 +154,16 @@ export function MatchCard({ match }: MatchCardProps) {
             </div>
           </div>
         </div>
+
+        {/* Timezone Time */}
+        {timeInfo && match.status === 'scheduled' && (
+          <div style={{
+            fontSize: 11, color: 'var(--text-3)',
+            textAlign: 'center', marginBottom: 8,
+          }}>
+            {timeInfo.full}
+          </div>
+        )}
 
         {/* Actions */}
         <div style={{ display: 'flex', gap: 6 }}>

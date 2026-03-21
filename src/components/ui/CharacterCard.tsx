@@ -2,6 +2,21 @@
 import Link from 'next/link'
 import type { Character } from '@/types'
 
+const EXPERTISE: Record<string, string[]> = {
+  'el-maestro':    ['Tactics', 'Formation', 'Strategy'],
+  'xg-oracle':     ['xG', 'Stats', 'Data'],
+  'fpl-guru':      ['Fantasy', 'FPL', 'Picks'],
+  'var-review':    ['Rules', 'VAR', 'Decisions'],
+  'the-archive':   ['History', 'Records', 'Lore'],
+  'talentspotter': ['Scouting', 'Players', 'Transfers'],
+  'the-voice':     ['Commentary', 'Drama', 'Live'],
+  'ultra':         ['Passion', 'Fan culture', 'Banter'],
+  'coach-believe': ['Motivation', 'Mindset', 'Inspire'],
+  'chef-fury':     ['Opinions', 'Takes', 'Rants'],
+  'aria-9':        ['AI', 'Systems', 'Data'],
+  'multiverse':    ['What-if', 'Alternate', 'Timeline'],
+}
+
 interface CharacterCardProps {
   character: Character
   size?: 'sm' | 'md' | 'lg'
@@ -82,6 +97,16 @@ export function CharacterCard({ character, size = 'md' }: CharacterCardProps) {
           }}>
             {character.role}
           </div>
+
+          {(EXPERTISE[character.id] ?? []).length > 0 && (
+            <div style={{
+              display: 'flex', gap: 3, flexWrap: 'wrap', marginTop: 5, marginBottom: 8,
+            }}>
+              {(EXPERTISE[character.id] ?? []).slice(0, 2).map(tag => (
+                <span key={tag} className="expertise-tag">{tag}</span>
+              ))}
+            </div>
+          )}
 
           {character.phase === 1 && (
             <div style={{

@@ -54,6 +54,7 @@ export function VoiceButton({ onTranscript, disabled }: VoiceButtonProps) {
     <button
       onClick={toggleListening}
       disabled={disabled}
+      aria-label={listening ? 'Stop voice input' : 'Start voice input — speak your question'}
       title={listening ? 'Stop listening' : 'Speak your question'}
       style={{
         width: 38, height: 38, borderRadius: 8, flexShrink: 0,

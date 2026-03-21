@@ -22,6 +22,9 @@ export function ReactionStrip({ matchId, expanded = false }: ReactionStripProps)
   const [animating, setAnimating] = useState<ReactionKey | null>(null)
 
   async function handleReaction(key: ReactionKey) {
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      navigator.vibrate(8)
+    }
     // Optimistic update
     setCounts(prev => ({ ...prev, [key]: prev[key] + 1 }))
     setUserVote(key)

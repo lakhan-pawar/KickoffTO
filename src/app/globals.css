@@ -283,3 +283,105 @@ body {
 }
 .momentum-bar-surge { transition: width 600ms cubic-bezier(0.2,1.4,0.4,1); }
 .canada-home-match { border-color: rgba(227,24,55,0.35) !important; }
+
+/* -- Focus visible (WCAG) ------------------------------ */
+:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* -- Toast notifications ------------------------------- */
+.toast-container {
+  position: fixed;
+  bottom: 72px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 500;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  pointer-events: none;
+}
+
+.toast {
+  background: rgba(20, 20, 20, 0.96);
+  border: 1px solid rgba(255,255,255,0.1);
+  backdrop-filter: blur(16px);
+  border-radius: 99px;
+  padding: 10px 20px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+  animation: toastIn 0.25s ease-out, toastOut 0.3s ease-in 1.7s forwards;
+  pointer-events: none;
+}
+
+.toast.success { border-color: rgba(22,163,74,0.4); color: #4ade80; }
+.toast.error   { border-color: rgba(239,68,68,0.4); color: #f87171; }
+
+@keyframes toastIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.95); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes toastOut {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to   { opacity: 0; transform: translateY(-8px) scale(0.95); }
+}
+
+/* -- Hero atmosphere glow ------------------------------ */
+.hero-atmosphere {
+  background:
+    radial-gradient(ellipse 70% 50% at 50% -10%,
+      rgba(22,163,74,0.18) 0%, transparent 70%),
+    radial-gradient(ellipse 40% 30% at 20% 50%,
+      rgba(22,163,74,0.06) 0%, transparent 60%),
+    radial-gradient(ellipse 40% 30% at 80% 50%,
+      rgba(22,163,74,0.06) 0%, transparent 60%);
+}
+
+/* -- Expertise tag pills ------------------------------- */
+.expertise-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 5px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  background: rgba(0,0,0,0.3);
+  color: rgba(255,255,255,0.6);
+  border: 1px solid rgba(255,255,255,0.1);
+  white-space: nowrap;
+}
+
+/* -- Match status badge -------------------------------- */
+.match-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 99px;
+  font-size: 10px;
+  font-weight: 700;
+}
+.match-badge.live {
+  background: rgba(239,68,68,0.15);
+  color: #f87171;
+  border: 1px solid rgba(239,68,68,0.2);
+}
+.match-badge.upcoming {
+  background: rgba(22,163,74,0.12);
+  color: #4ade80;
+  border: 1px solid rgba(22,163,74,0.2);
+}
+.match-badge.finished {
+  background: var(--bg-elevated);
+  color: var(--text-3);
+  border: 1px solid var(--border);
+}
+
+.social-link:hover { color: var(--text) !important; border-color: var(--border-mid) !important; }
