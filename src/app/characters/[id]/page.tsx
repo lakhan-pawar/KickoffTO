@@ -108,6 +108,18 @@ export default function CharacterPage() {
             </p>
 
             <ShareButton characterId={character.id} />
+            <a
+              href={`/share/character/${character.id}`}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                width: '100%', padding: '8px 12px', marginTop: 6,
+                background: 'var(--bg-elevated)', border: '1px solid var(--border)',
+                borderRadius: 8, fontSize: 12, fontWeight: 500,
+                color: 'var(--text-3)', textDecoration: 'none',
+              }}
+            >
+              📱 Share quote card →
+            </a>
 
             <div style={{ marginTop: 14 }}>
               <p style={{

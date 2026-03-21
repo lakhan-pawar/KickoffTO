@@ -3,7 +3,8 @@ import { useChat } from 'ai/react'
 import { useEffect, useRef, useState } from 'react'
 import { ShareButton } from './ShareButton'
 import { SuggestedPrompts } from './SuggestedPrompts'
-import { VoiceMode } from './VoiceMode'
+import { VoiceButton } from './VoiceButton'
+import { speakAsCharacter, stopSpeaking } from './CharacterTTS'
 import type { Character } from '@/types'
 
 interface ChatPanelProps {
@@ -37,11 +38,16 @@ export function ChatPanel({ character }: ChatPanelProps) {
       setApiError(err.message || 'Unknown error')
       setApiStatus('error')
     },
-    onFinish: () => {
+    onFinish: (message) => {
       setApiStatus('ok')
       setApiError('')
+      if (isVoiceActive) speakAsCharacter(message.content, character.id)
     },
   })
+
+  useEffect(() => {
+    if (!isVoiceActive) stopSpeaking()
+  }, [isVoiceActive])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -181,13 +187,7 @@ export function ChatPanel({ character }: ChatPanelProps) {
         flex: 1, overflowY: 'auto', padding: 14,
         display: 'flex', flexDirection: 'column', gap: 12,
       }}>
-        <VoiceMode
-          isActive={isVoiceActive}
-          onTranscript={(text) => {
-            setInput(text)
-            // Auto submit can be tricky with ai/react, so we just set input for now
-          }}
-        />
+        {/* Legacy VoiceMode removed in favor of inline VoiceButton */}
         {messages.map(message => (
           <div key={message.id} style={{
             display: 'flex',
@@ -261,6 +261,10 @@ export function ChatPanel({ character }: ChatPanelProps) {
         padding: '10px 12px', borderTop: '1px solid var(--border)',
         display: 'flex', gap: 8,
       }}>
+        <VoiceButton 
+          onTranscript={(text) => setInput(text)} 
+          disabled={isLoading}
+        />
         <input
           type="text"
           value={input}

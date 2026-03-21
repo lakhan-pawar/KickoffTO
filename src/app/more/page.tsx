@@ -19,6 +19,8 @@ const MORE_LINKS = [
     desc: 'AI commentary · The Voice · El Maestro · Ultra · ARIA-9' },
   { href: '/heatwave', icon: '🌡️', label: 'Global Heatwave',
     desc: 'Where WC2026 is trending most right now' },
+  { href: '/share/match/mock-arg-fra', icon: '📱', label: 'Share Match Card',
+    desc: '9:16 match result card for Stories · Reels · TikTok' },
   { href: '/analyse', icon: '📸', label: 'Match Analyser',
     desc: 'Screenshot your TV · Gemini reads the formation' },
   { href: '/games/chant', icon: '📣', label: 'Chant Creator',
