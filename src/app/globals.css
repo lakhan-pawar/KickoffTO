@@ -106,6 +106,22 @@ body { background: var(--bg); color: var(--text); font-family: var(--font-body),
 /* ── Tabular nums on scores ── */
 .tabular { font-variant-numeric:tabular-nums; }
 
+/* ── Card hovers ── */
+.card-hover {
+  transition: border-color 0.15s, transform 0.15s !important;
+}
+.card-hover:hover {
+  border-color: var(--green) !important;
+  transform: translateY(-2px);
+}
+.card-archive-hover {
+  transition: border-color 0.15s, transform 0.15s !important;
+}
+.card-archive-hover:hover {
+  border-color: #1a3a1a !important;
+  transform: translateY(-2px);
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar { width:4px; height:4px; }
 ::-webkit-scrollbar-track { background:var(--bg); }
