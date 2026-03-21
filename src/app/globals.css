@@ -385,3 +385,5 @@ body {
 }
 
 .social-link:hover { color: var(--text) !important; border-color: var(--border-mid) !important; }
+@ k e y f r a m e s   s p i n   {   f r o m   {   t r a n s f o r m :   r o t a t e ( 0 d e g ) ;   }   t o   {   t r a n s f o r m :   r o t a t e ( 3 6 0 d e g ) ;   }   }  
+ 

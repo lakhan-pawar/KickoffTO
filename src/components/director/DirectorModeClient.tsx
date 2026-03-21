@@ -47,6 +47,7 @@ export function DirectorModeClient({ match, initialGenre }: DirectorModeClientPr
   const [audioError, setAudioError]       = useState('')
   const [isPlaying, setIsPlaying]         = useState(false)
   const [cached, setCached]               = useState(false)
+  const [audioStatus, setAudioStatus]     = useState('')
   const audioRef = useRef<HTMLAudioElement>(null)
 
   const genre = GENRES.find(g => g.id === selectedGenre)
@@ -82,6 +83,12 @@ export function DirectorModeClient({ match, initialGenre }: DirectorModeClientPr
     setAudioLoading(true)
     setAudioError('')
     setAudioUrl(null)
+    setAudioStatus('Sending to Unreal Speech...')
+
+    // Show "still working" message after 10 seconds
+    const slowTimer = setTimeout(() => {
+      setAudioStatus('Generating audio... this takes 15-20 seconds ⏳')
+    }, 10000)
 
     try {
       const res = await fetch(`/api/director/${match.id}/narrate`, {
@@ -89,6 +96,8 @@ export function DirectorModeClient({ match, initialGenre }: DirectorModeClientPr
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ script, genre: selectedGenre }),
       })
+
+      clearTimeout(slowTimer)
 
       // Always parse as text first to avoid JSON parse errors
       const rawText = await res.text()
@@ -103,11 +112,14 @@ export function DirectorModeClient({ match, initialGenre }: DirectorModeClientPr
 
       if (data.audioUrl) {
         setAudioUrl(data.audioUrl)
+        setAudioStatus('')
       } else {
         // Show helpful error based on what went wrong
         let errorMsg = data.error ?? 'Audio generation failed'
 
-        if (errorMsg.includes('No UNREAL_SPEECH_API_KEY')) {
+        if (errorMsg.includes('FUNCTION_INVOCATION_TIMEOUT')) {
+          errorMsg = '⏱️ Generation timed out. Try a shorter script or try again.'
+        } else if (errorMsg.includes('No UNREAL_SPEECH_API_KEY')) {
           errorMsg = '⚙️ Unreal Speech API key not configured. Add UNREAL_SPEECH_API_KEY_1 to Vercel.'
         } else if (errorMsg.includes('401') || errorMsg.includes('Unauthorized')) {
           errorMsg = '🔑 Invalid API key. Check UNREAL_SPEECH_API_KEY_1 in Vercel settings.'
@@ -118,6 +130,7 @@ export function DirectorModeClient({ match, initialGenre }: DirectorModeClientPr
         }
 
         setAudioError(errorMsg)
+        setAudioStatus('')
 
         // Log debug info to console for developer visibility
         if (data.debug) {
@@ -125,7 +138,9 @@ export function DirectorModeClient({ match, initialGenre }: DirectorModeClientPr
         }
       }
     } catch (err: unknown) {
+      clearTimeout(slowTimer)
       setAudioError(err instanceof Error ? err.message : 'Network error — check connection')
+      setAudioStatus('')
     } finally {
       setAudioLoading(false)
     }
@@ -371,7 +386,17 @@ export function DirectorModeClient({ match, initialGenre }: DirectorModeClientPr
                   boxShadow: audioLoading ? 'none' : `0 4px 16px ${genre.color}44`,
                 }}
               >
-                {audioLoading ? '⏳ Generating audio...' : '▶ Generate audio'}
+                {audioLoading ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{
+                      width: 14, height: 14, border: '2px solid rgba(255,255,255,0.3)',
+                      borderTop: '2px solid #fff', borderRadius: '50%',
+                      animation: 'spin 0.8s linear infinite',
+                      display: 'inline-block', flexShrink: 0,
+                    }} />
+                    {audioStatus || 'Generating...'}
+                  </div>
+                ) : '▶ Generate audio'}
               </button>
             </div>
 

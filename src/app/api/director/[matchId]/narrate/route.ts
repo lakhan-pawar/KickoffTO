@@ -1,8 +1,10 @@
 // src/app/api/director/[matchId]/narrate/route.ts
+// NO edge runtime — needs Node.js for longer timeout (60s on Vercel)
 import { NextRequest, NextResponse } from 'next/server'
 import { textToSpeech } from '@/lib/unrealspeech'
 
-export const runtime = 'edge'
+// Do NOT add: export const runtime = 'edge'
+// Node.js runtime allows up to 60s on Vercel hobby plan
 
 export async function POST(
   request: NextRequest,

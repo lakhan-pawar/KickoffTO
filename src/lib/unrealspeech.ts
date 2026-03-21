@@ -38,7 +38,7 @@ export async function textToSpeech(
   genre: string = 'heist'
 ): Promise<TTSResult> {
   const voiceId = GENRE_VOICES[genre] ?? 'Will'
-  const truncated = text.slice(0, 3000)
+  const truncated = text.slice(0, 1500) // shorter = faster generation, less timeout risk
 
   if (KEYS.length === 0) {
     return {
@@ -52,6 +52,9 @@ export async function textToSpeech(
   for (let attempt = 0; attempt < KEYS.length; attempt++) {
     const key = nextKey()
     if (!key) continue
+
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 25000) // 25s timeout
 
     try {
       const res = await fetch('https://api.v7.unrealspeech.com/speech', {
@@ -68,7 +71,10 @@ export async function textToSpeech(
           Pitch: '1',
           TimestampType: 'sentence',
         }),
+        signal: controller.signal,
       })
+
+      clearTimeout(timeoutId)
 
       // Always read as text first — API sometimes returns plain text errors
       const rawText = await res.text()
@@ -131,6 +137,7 @@ export async function textToSpeech(
       return { audioUrl, usedFallback: false }
 
     } catch (err: unknown) {
+      clearTimeout(timeoutId)
       if (attempt < KEYS.length - 1) continue
       return {
         audioUrl: null,
