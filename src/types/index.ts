@@ -74,6 +74,7 @@ export interface SocialPost {
   source: 'bluesky' | 'reddit' | 'news'
   url: string
   score?: number // reddit upvotes
+  subreddit?: string // for reddit source
 }
 
 // Character types
