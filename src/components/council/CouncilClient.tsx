@@ -66,16 +66,72 @@ export function CouncilClient() {
               content: `Council question: "${q}"\n\nReply in 2-3 sentences max. Stay in character. Be direct. No preamble.`,
             }],
           }),
-          signal: AbortSignal.timeout(14000),
+          signal: AbortSignal.timeout(20000),
         })
-        const data = await res.json()
-        const text = (data.response ?? data.content ?? data.message ?? '').trim()
+
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+
+        // Read as text — AI SDK returns a stream, not plain JSON
+        const raw = await res.text()
+        let text = ''
+
+        // Parse AI SDK stream format: lines starting with 0: are text chunks
+        for (const line of raw.split('\n')) {
+          const trimmed = line.trim()
+
+          // Format: 0:"chunk of text"
+          if (trimmed.startsWith('0:')) {
+            try {
+              const chunk = JSON.parse(trimmed.slice(2))
+              text += chunk
+            } catch {}
+          }
+
+          // Some versions use: data: {"choices":[{"delta":{"content":"..."}}]}
+          if (trimmed.startsWith('data: ') && trimmed !== 'data: [DONE]') {
+            try {
+              const data = JSON.parse(trimmed.slice(6))
+              const chunk = data?.choices?.[0]?.delta?.content
+                ?? data?.content
+                ?? data?.text
+                ?? ''
+              text += chunk
+            } catch {}
+          }
+
+          // Plain JSON fallback: {"response":"..."}
+          if (trimmed.startsWith('{') && !text) {
+            try {
+              const data = JSON.parse(trimmed)
+              text = data.response ?? data.content ?? data.message ?? data.text ?? ''
+            } catch {}
+          }
+        }
+
+        // If still empty try parsing entire response as JSON
+        if (!text) {
+          try {
+            const data = JSON.parse(raw)
+            text = data.response ?? data.content ?? data.message ?? data.text ?? ''
+          } catch {}
+        }
+
+        const finalText = text.trim() || FALLBACKS[agent.id]
+
         setResponses(prev =>
-          prev.map(r => r.id === agent.id ? { ...r, text: text || FALLBACKS[agent.id], loading: false } : r)
+          prev.map(r =>
+            r.id === agent.id
+              ? { ...r, text: finalText, loading: false }
+              : r
+          )
         )
-      } catch {
+      } catch (err) {
         setResponses(prev =>
-          prev.map(r => r.id === agent.id ? { ...r, text: FALLBACKS[agent.id], loading: false } : r)
+          prev.map(r =>
+            r.id === agent.id
+              ? { ...r, text: FALLBACKS[agent.id], loading: false }
+              : r
+          )
         )
       }
     })
@@ -92,15 +148,38 @@ export function CouncilClient() {
         body: JSON.stringify({
           messages: [{
             role: 'user',
-            content: `As council chair, give a 1-sentence verdict on: "${q}". Start directly — no preamble.`,
+            content: `As council chair, give a 1-sentence verdict on: "${q}". Be direct — no preamble.`,
           }],
         }),
-        signal: AbortSignal.timeout(8000),
+        signal: AbortSignal.timeout(12000),
       })
-      const data = await res.json()
-      setVerdict((data.response ?? data.content ?? '').trim())
+
+      const raw = await res.text()
+      let text = ''
+
+      for (const line of raw.split('\n')) {
+        const trimmed = line.trim()
+        if (trimmed.startsWith('0:')) {
+          try { text += JSON.parse(trimmed.slice(2)) } catch {}
+        }
+        if (trimmed.startsWith('data: ') && trimmed !== 'data: [DONE]') {
+          try {
+            const data = JSON.parse(trimmed.slice(6))
+            text += data?.choices?.[0]?.delta?.content ?? ''
+          } catch {}
+        }
+      }
+
+      if (!text) {
+        try {
+          const data = JSON.parse(raw)
+          text = data.response ?? data.content ?? data.message ?? ''
+        } catch {}
+      }
+
+      setVerdict(text.trim() || "The council is divided — no clear consensus.")
     } catch {
-      setVerdict("The council remains divided — no clear consensus on this one.")
+      setVerdict("The council is divided — no clear consensus.")
     } finally {
       setVL(false)
     }
