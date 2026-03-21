@@ -11,12 +11,13 @@ async function fetchNews(): Promise<SocialPost[]> {
 
   if (!apiKey) throw new Error('No NewsData API key')
 
+  // Refined query: specifically FIFA World Cup 2026
   const url = `https://newsdata.io/api/1/news`
     + `?apikey=${apiKey}`
-    + `&q=World+Cup+2026`
+    + `&q="World+Cup+2026"+OR+"FIFA+World+Cup"`
     + `&language=en`
     + `&category=sports`
-    + `&size=10`
+    + `&size=15`
 
   const res = await fetch(url, {
     headers: { 'Accept': 'application/json' },
@@ -39,21 +40,25 @@ async function fetchNews(): Promise<SocialPost[]> {
 
   if (data.status !== 'success') throw new Error('NewsData error')
 
-  return (data.results ?? []).map(a => ({
-    id: a.article_id,
-    text: a.title + (a.description ? ` — ${a.description}` : ''),
-    author: a.source_name,
-    created: a.pubDate,
-    source: 'news' as const,
-    url: a.link,
-  }))
+  return (data.results ?? [])
+    .filter(a => a.title.toLowerCase().includes('cup') || a.title.toLowerCase().includes('fifa'))
+    .map(a => ({
+      id: a.article_id,
+      text: a.title + (a.description ? ` — ${a.description}` : ''),
+      author: a.source_name,
+      created: a.pubDate,
+      source: 'news' as const,
+      url: a.link,
+    }))
 }
 
 // ── Reddit r/worldcup — secondary source ──────────────────
 async function fetchReddit(): Promise<SocialPost[]> {
   const urls = [
-    'https://www.reddit.com/r/worldcup/hot.json?limit=20',
-    'https://www.reddit.com/r/soccer/search.json?q=World+Cup+2026&sort=new&limit=15',
+    'https://www.reddit.com/r/worldcup/hot.json?limit=15',
+    'https://www.reddit.com/r/soccer/search.json?q=World+Cup+2026&sort=new&limit=15&restrict_sr=1',
+    'https://www.reddit.com/r/ussoccer/hot.json?limit=10',
+    'https://www.reddit.com/r/CanadaSoccer/hot.json?limit=10',
   ]
 
   const posts: SocialPost[] = []
@@ -84,6 +89,10 @@ async function fetchReddit(): Promise<SocialPost[]> {
 
       const items = data?.data?.children ?? []
       items.forEach(({ data: p }) => {
+        // Basic relevance check for the broader subreddits
+        const title = p.title.toLowerCase()
+        if (url.includes('soccer') && !title.match(/cup|fifa|2026|mexico|canada|usa|national/)) return
+
         posts.push({
           id: p.id,
           text: p.title,
