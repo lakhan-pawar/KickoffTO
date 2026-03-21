@@ -5,9 +5,9 @@ const REDDIT_UA = 'KickoffTo/1.0 (contact: hello@kickoffto.com)'
 
 // ── Reddit — PRIMARY source (always football-specific) ─────
 const FOOTBALL_SUBREDDITS = [
-  { sub: 'worldcup',  hot: true  },
-  { sub: 'soccer',    hot: false },
-  { sub: 'football',  hot: false },
+  { sub: 'worldcup',  hot: true },
+  { sub: 'soccer',    hot: true },
+  { sub: 'football',  hot: true },
 ]
 
 async function fetchRedditSub(
