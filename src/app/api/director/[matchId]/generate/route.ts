@@ -1,3 +1,4 @@
+// src/app/api/director/[matchId]/generate/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { groqChat } from '@/lib/groq'
 import { getCache, setCache } from '@/lib/redis'
@@ -5,59 +6,99 @@ import { getCache, setCache } from '@/lib/redis'
 export const runtime = 'edge'
 
 const GENRE_PROMPTS: Record<string, string> = {
-  horror: `You are a horror screenplay writer. Retell this football match as a terrifying horror story. The stadium is an eerie place, the crowd a faceless mob, goals are shocking moments of dread. Use screenplay format: scene headings in CAPS, action lines, character names in CAPS before dialogue. 300 words max.`,
-  romance: `You are a romantic screenplay writer. Retell this football match as a sweeping romance. Players fall for the game, the crowd is the backdrop, goals are moments of pure joy. Screenplay format. 300 words max.`,
-  heist: `You are a heist thriller screenplay writer. Retell this football match as a sophisticated heist. The team is a crew, the goal is the vault, the tactics are the plan. Screenplay format. 300 words max.`,
-  scifi: `You are a sci-fi screenplay writer. Retell this football match set in the far future. Players are enhanced humans or AIs, the stadium is on another planet, goals involve advanced technology. Screenplay format. 300 words max.`,
-  western: `You are a western screenplay writer. Retell this football match as a western showdown. The pitch is Main Street, the managers are sheriffs, goals are gunfights. Screenplay format. 300 words max.`,
-  comedy: `You are a comedy screenplay writer. Retell this football match as a slapstick comedy. Everything goes wrong in the most absurd ways, VAR decisions are comedic disasters, goals happen by accident. Screenplay format. 300 words max.`,
+  horror: `You are a horror screenwriter. Rewrite this football match as a terrifying horror story.
+Use dark atmosphere, dread, and suspense. The ball is cursed. The goalkeeper is haunted.
+Make it genuinely scary. 3 paragraphs. Cinematic. No football clichés.`,
+
+  romance: `You are a romantic screenwriter. Rewrite this football match as a passionate love story.
+Two teams — star-crossed lovers. Goals are stolen kisses. Cards are heartbreaks.
+Make it sweeping and emotional. 3 paragraphs. Cinematic.`,
+
+  heist: `You are a crime thriller screenwriter. Rewrite this match as an Ocean's Eleven-style heist.
+The stadium is the vault. The ball is the prize. Each goal is a perfectly executed move.
+Sharp, clever, stylish. 3 paragraphs. Cinematic.`,
+
+  scifi: `You are a sci-fi screenwriter. Rewrite this match as a battle in the far future.
+Players are androids. The pitch is a space station. Goals are quantum events.
+Epic and futuristic. 3 paragraphs. Cinematic.`,
+
+  western: `You are a western screenwriter. Rewrite this match as a classic gunfight showdown.
+Two rival clans. The stadium is a dusty frontier town. Goals are draws at high noon.
+Gritty, tense, sparse dialogue. 3 paragraphs. Cinematic.`,
+
+  comedy: `You are a comedy screenwriter. Rewrite this match as a hilarious farce.
+Everything goes wrong in the funniest possible way. The referee is incompetent.
+The goalkeepers are terrified of the ball. Absurd and funny. 3 paragraphs.`,
 }
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ matchId: string }> }
 ) {
-  try {
-    const { matchId } = await params
-    const { genre, match } = await request.json()
+  const { matchId } = await params
 
-    if (!GENRE_PROMPTS[genre]) {
-      return NextResponse.json({ error: 'Invalid genre' }, { status: 400 })
+  try {
+    const body = await request.json()
+    const { genre, match } = body as {
+      genre: string
+      match: {
+        homeTeam: { name: string; flag: string }
+        awayTeam: { name: string; flag: string }
+        homeScore: number
+        awayScore: number
+        events: Array<{ minute: number; type: string; player: string; team: string }>
+      }
     }
 
-    // Check cache
+    if (!genre || !match) {
+      return NextResponse.json({ error: 'Missing genre or match data' }, { status: 400 })
+    }
+
+    // Cache key per match + genre
     const cacheKey = `director:${matchId}:${genre}`
-    const cached = await getCache<{ script: string }>(cacheKey)
-    if (cached) return NextResponse.json(cached)
+    try {
+      const cached = await getCache<{ script: string }>(cacheKey)
+      if (cached) return NextResponse.json({ script: cached.script, cached: true })
+    } catch {}
 
-    const systemPrompt = GENRE_PROMPTS[genre]
+    const genrePrompt = GENRE_PROMPTS[genre] ?? GENRE_PROMPTS.heist
 
-    const userPrompt = `Match: ${match.homeTeam} ${match.homeScore}–${match.awayScore} ${match.awayTeam}
-Venue: ${match.venue}
+    // Build match context
+    const eventsText = match.events
+      .map(e => `${e.minute}' ${e.type.toUpperCase()} — ${e.player} (${e.team})`)
+      .join('\n')
+
+    const matchContext = `
+Match: ${match.homeTeam.name} ${match.homeScore} - ${match.awayScore} ${match.awayTeam.name}
 Key events:
-${match.events.map((e: any) =>
-  `- ${e.minute}': ${e.type === 'goal' ? '⚽ GOAL' : e.type.toUpperCase()} — ${e.player} (${e.team}) — ${e.detail}`
-).join('\n')}
+${eventsText || 'No events recorded yet'}
+`
 
-Write the screenplay now. Use proper screenplay format.
-Start with FADE IN: and end with FADE OUT.
-Include at least 3 scenes. Name characters after the actual players.`
+    const screenplay = await groqChat(
+      [{
+        role: 'user',
+        content: `${genrePrompt}
 
-    const script = await groqChat(
-      [{ role: 'user', content: userPrompt }],
+${matchContext}
+
+Write the screenplay now. Start immediately — no preamble.
+Use the actual player names and teams but transform the context completely.
+3 paragraphs. Vivid and cinematic.`,
+      }],
       'llama-3.3-70b-versatile',
-      700,
-      systemPrompt,
+      500,
     )
 
-    const result = { script: script.trim(), genre, matchId }
+    const result = { script: screenplay.trim(), cached: false }
 
-    // Cache permanently — same match + genre always gives same script
-    await setCache(cacheKey, result)
+    try { await setCache(cacheKey, result, 3600) } catch {}
 
     return NextResponse.json(result)
+
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : 'Unknown error'
-    return NextResponse.json({ error: msg }, { status: 500 })
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : 'Generation failed' },
+      { status: 500 }
+    )
   }
 }

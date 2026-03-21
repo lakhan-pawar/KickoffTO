@@ -1,14 +1,24 @@
 'use client'
-import { useState } from 'react'
+import { useState, useRef } from 'react'
+import { Flag, FLAG_ISO } from '@/components/ui/Flag'
 
+// Fixed emoji — no encoding issues
 const GENRES = [
-  { id: 'horror',  emoji: '🎃', name: 'Horror',  desc: 'A nightmare unfolding in 90 minutes', tint: 'rgba(220,38,38,0.04)' },
-  { id: 'romance', emoji: '💕', name: 'Romance', desc: 'Love in the beautiful game', tint: 'rgba(244,63,94,0.04)' },
-  { id: 'heist',   emoji: '💰', name: 'Heist',   desc: 'The perfect footballing robbery', tint: 'rgba(217,119,6,0.04)' },
-  { id: 'scifi',   emoji: '🚀', name: 'Sci-Fi',  desc: 'Football in the far future', tint: 'rgba(37,99,235,0.04)' },
-  { id: 'western', emoji: '🤠', name: 'Western', desc: 'A duel at high noon', tint: 'rgba(180,83,9,0.04)' },
-  { id: 'comedy',  emoji: '😂', name: 'Comedy',  desc: 'When football gets absurd', tint: 'rgba(22,163,74,0.04)' },
+  { id: 'horror',  emoji: '🎃', name: 'Horror',      desc: 'A nightmare in 90 minutes',      voice: 'Dan',      color: '#dc2626' },
+  { id: 'romance', emoji: '💕', name: 'Romance',     desc: 'Love in the beautiful game',     voice: 'Liv',      color: '#f43f5e' },
+  { id: 'heist',   emoji: '💰', name: 'Heist',       desc: 'The perfect footballing robbery', voice: 'Will',     color: '#d97706' },
+  { id: 'scifi',   emoji: '🚀', name: 'Sci-Fi',      desc: 'Football in the far future',     voice: 'Scarlett', color: '#2563eb' },
+  { id: 'western', emoji: '🤠', name: 'Western',     desc: 'A duel at high noon',            voice: 'Dan',      color: '#b45309' },
+  { id: 'comedy',  emoji: '😂', name: 'Comedy',      desc: 'When football gets absurd',      voice: 'Freya',    color: '#16a34a' },
 ]
+
+interface MatchEvent {
+  minute: number
+  type: string
+  player: string
+  team: string
+  detail?: string
+}
 
 interface MatchData {
   id: string
@@ -19,146 +29,217 @@ interface MatchData {
   status: string
   round: string
   venue: string
-  events: Array<{
-    minute: number
-    type: string
-    team: string
-    player: string
-    detail: string
-  }>
+  events: MatchEvent[]
 }
 
 interface DirectorModeClientProps {
   match: MatchData
-  initialGenre: string | null
+  initialGenre?: string | null
 }
 
 export function DirectorModeClient({ match, initialGenre }: DirectorModeClientProps) {
-  const [selectedGenre, setSelectedGenre] = useState<string | null>(initialGenre)
-  const [script, setScript] = useState<string>('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [copied, setCopied] = useState(false)
+  const [selectedGenre, setSelectedGenre] = useState<string | null>(null)
+  const [script, setScript]               = useState('')
+  const [loading, setLoading]             = useState(false)
+  const [error, setError]                 = useState('')
+  const [audioUrl, setAudioUrl]           = useState<string | null>(null)
+  const [audioLoading, setAudioLoading]   = useState(false)
+  const [audioError, setAudioError]       = useState('')
+  const [isPlaying, setIsPlaying]         = useState(false)
+  const [cached, setCached]               = useState(false)
+  const audioRef = useRef<HTMLAudioElement>(null)
 
-  async function generateScript(genreId: string) {
+  const genre = GENRES.find(g => g.id === selectedGenre)
+
+  async function generate(genreId: string) {
     setSelectedGenre(genreId)
     setLoading(true)
     setError('')
     setScript('')
+    setAudioUrl(null)
+    setAudioError('')
 
     try {
       const res = await fetch(`/api/director/${match.id}/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          genre: genreId,
-          match: {
-            homeTeam: match.homeTeam.name,
-            awayTeam: match.awayTeam.name,
-            homeScore: match.homeScore,
-            awayScore: match.awayScore,
-            venue: match.venue,
-            events: match.events,
-          },
-        }),
+        body: JSON.stringify({ genre: genreId, match }),
       })
 
       if (!res.ok) throw new Error(`API error ${res.status}`)
       const data = await res.json()
-      setScript(data.script ?? 'No script generated.')
+      setScript(data.script ?? '')
+      setCached(data.cached ?? false)
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Unknown error'
-      setError(`Failed to generate script: ${msg}`)
+      setError(err instanceof Error ? err.message : 'Generation failed')
     } finally {
       setLoading(false)
     }
   }
 
-  function shareScript() {
-    const url = `${window.location.origin}/director/${match.id}?genre=${selectedGenre}`
-    navigator.clipboard?.writeText(url)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2500)
+  async function narrate() {
+    if (!script || !selectedGenre) return
+    setAudioLoading(true)
+    setAudioError('')
+    setAudioUrl(null)
+
+    try {
+      const res = await fetch(`/api/director/${match.id}/narrate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ script, genre: selectedGenre }),
+      })
+
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error ?? `API error ${res.status}`)
+      }
+
+      const data = await res.json()
+      setAudioUrl(data.audioUrl)
+    } catch (err: unknown) {
+      setAudioError(err instanceof Error ? err.message : 'Narration failed')
+    } finally {
+      setAudioLoading(false)
+    }
   }
 
-  const activeGenre = GENRES.find(g => g.id === selectedGenre)
+  function togglePlay() {
+    const audio = audioRef.current
+    if (!audio) return
+    if (isPlaying) {
+      audio.pause()
+      setIsPlaying(false)
+    } else {
+      audio.play()
+      setIsPlaying(true)
+    }
+  }
+
+  const homeIso = FLAG_ISO[match.homeTeam.code?.toUpperCase()] ?? 'un'
+  const awayIso = FLAG_ISO[match.awayTeam.code?.toUpperCase()] ?? 'un'
 
   return (
-    <div>
-      {/* Header */}
-      <div style={{ marginBottom: 28 }}>
-        <p style={{
-          fontSize: 10, fontWeight: 700, color: 'var(--green)',
-          textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8,
-        }}>
-          Hollywood Director Mode
-        </p>
-        <h1 style={{
-          fontFamily: 'var(--font-display)', fontWeight: 800,
-          fontSize: 'clamp(22px, 4vw, 36px)',
-          letterSpacing: -0.5, color: 'var(--text)', marginBottom: 8,
-          lineHeight: 1.1,
-        }}>
-          {match.homeTeam.flag} {match.homeTeam.name} {match.homeScore}–{match.awayScore} {match.awayTeam.name} {match.awayTeam.flag}
-        </h1>
-        <p style={{ fontSize: 13, color: 'var(--text-3)' }}>
-          {match.round} · {match.venue} · Pick a genre to retell this match as a screenplay
-        </p>
+    <div style={{ maxWidth: 720, margin: '0 auto' }}>
+
+      {/* Match header */}
+      <div style={{
+        background: 'var(--bg-card)', border: '1px solid var(--border)',
+        borderRadius: 16, padding: '16px 20px', marginBottom: 20,
+        display: 'flex', alignItems: 'center', gap: 16, justifyContent: 'center',
+      }}>
+        <div style={{ textAlign: 'center' }}>
+          <img src={`https://flagcdn.com/w80/${homeIso}.png`} alt={match.homeTeam.name}
+            width={48} height={34} style={{ objectFit: 'cover', borderRadius: 5, marginBottom: 6, boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }} />
+          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
+            {match.homeTeam.name}
+          </div>
+        </div>
+
+        <div style={{ textAlign: 'center' }}>
+          <div style={{
+            fontFamily: 'var(--font-display)', fontWeight: 900,
+            fontSize: 36, color: 'var(--text)', letterSpacing: -2,
+            fontVariantNumeric: 'tabular-nums',
+          }}>
+            {match.homeScore} – {match.awayScore}
+          </div>
+          <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 2 }}>
+            {match.round} · {match.venue}
+          </div>
+        </div>
+
+        <div style={{ textAlign: 'center' }}>
+          <img src={`https://flagcdn.com/w80/${awayIso}.png`} alt={match.awayTeam.name}
+            width={48} height={34} style={{ objectFit: 'cover', borderRadius: 5, marginBottom: 6, boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }} />
+          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
+            {match.awayTeam.name}
+          </div>
+        </div>
       </div>
 
       {/* Genre selector */}
+      <p style={{
+        fontSize: 10, fontWeight: 700, color: 'var(--text-3)',
+        textTransform: 'uppercase', letterSpacing: '0.08em',
+        marginBottom: 12,
+      }}>
+        Choose a genre
+      </p>
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))',
-        gap: 8, marginBottom: 24,
+        gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
+        gap: 8, marginBottom: 20,
       }}>
-        {GENRES.map(genre => (
+        {GENRES.map(g => (
           <button
-            key={genre.id}
-            onClick={() => generateScript(genre.id)}
+            key={g.id}
+            onClick={() => generate(g.id)}
             disabled={loading}
             style={{
-              background: selectedGenre === genre.id
-                ? 'var(--bg-elevated)' : 'var(--bg-card)',
-              border: `1px solid ${selectedGenre === genre.id
-                ? 'var(--green)' : 'var(--border)'}`,
-              borderRadius: 12, padding: '12px 10px',
+              background: selectedGenre === g.id
+                ? g.color + '22' : 'var(--bg-card)',
+              border: `1px solid ${selectedGenre === g.id ? g.color : 'var(--border)'}`,
+              borderRadius: 12, padding: '12px 14px',
               cursor: loading ? 'not-allowed' : 'pointer',
-              textAlign: 'center', opacity: loading ? 0.6 : 1,
-              transition: 'border-color 0.15s, transform 0.15s',
+              textAlign: 'left',
+              transition: 'all 0.15s',
+              opacity: loading && selectedGenre !== g.id ? 0.5 : 1,
             }}
             onMouseEnter={e => {
-              if (!loading) (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--green)'
+              if (!loading) {
+                const el = e.currentTarget as HTMLButtonElement
+                el.style.borderColor = g.color
+                el.style.transform = 'translateY(-2px)'
+              }
             }}
             onMouseLeave={e => {
-              if (selectedGenre !== genre.id)
-                (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border)'
+              const el = e.currentTarget as HTMLButtonElement
+              el.style.borderColor = selectedGenre === g.id ? g.color : 'var(--border)'
+              el.style.transform = 'none'
             }}
           >
-            <div style={{ fontSize: 24, marginBottom: 5 }}>{genre.emoji}</div>
-            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginBottom: 2 }}>
-              {genre.name}
+            <div style={{ fontSize: 24, marginBottom: 6 }}>{g.emoji}</div>
+            <div style={{
+              fontSize: 13, fontWeight: 700,
+              color: selectedGenre === g.id ? g.color : 'var(--text)',
+              marginBottom: 2,
+            }}>
+              {g.name}
             </div>
-            <div style={{ fontSize: 10, color: 'var(--text-3)', lineHeight: 1.3 }}>
-              {genre.desc}
+            <div style={{ fontSize: 10, color: 'var(--text-3)' }}>{g.desc}</div>
+            <div style={{
+              fontSize: 9, color: 'var(--text-3)', marginTop: 4,
+              fontStyle: 'italic',
+            }}>
+              Voice: {g.voice}
             </div>
           </button>
         ))}
       </div>
 
-      {/* Loading state */}
+      {/* Loading */}
       {loading && (
         <div style={{
           background: 'var(--bg-card)', border: '1px solid var(--border)',
-          borderRadius: 12, padding: '32px 20px', textAlign: 'center',
-          marginBottom: 16,
+          borderRadius: 14, padding: '24px 20px', textAlign: 'center',
+          marginBottom: 20,
         }}>
-          <div style={{ fontSize: 32, marginBottom: 12 }}>{activeGenre?.emoji}</div>
-          <div style={{ fontSize: 14, color: 'var(--text-2)', marginBottom: 4 }}>
-            Writing the {activeGenre?.name} screenplay...
+          <div style={{
+            display: 'flex', gap: 6, justifyContent: 'center',
+            alignItems: 'center', marginBottom: 12,
+          }}>
+            {[0,1,2].map(i => (
+              <span key={i} style={{
+                width: 8, height: 8, borderRadius: '50%',
+                background: genre?.color ?? 'var(--green)',
+                display: 'inline-block',
+                animation: `typingBounce 0.6s ease-in-out ${i*0.15}s infinite`,
+              }} />
+            ))}
           </div>
-          <div style={{ fontSize: 12, color: 'var(--text-3)' }}>
-            Groq is adapting {match.events.length} match events
+          <div style={{ fontSize: 13, color: 'var(--text-2)' }}>
+            {genre?.emoji} Writing {genre?.name} screenplay...
           </div>
         </div>
       )}
@@ -167,83 +248,202 @@ export function DirectorModeClient({ match, initialGenre }: DirectorModeClientPr
       {error && (
         <div style={{
           background: 'rgba(220,38,38,0.08)',
-          border: '1px solid rgba(220,38,38,0.3)',
-          borderRadius: 10, padding: '12px 16px', marginBottom: 16,
-          fontSize: 13, color: 'var(--red-card)',
+          border: '1px solid rgba(220,38,38,0.25)',
+          borderRadius: 12, padding: '12px 16px',
+          fontSize: 13, color: '#f87171', marginBottom: 20,
         }}>
           {error}
         </div>
       )}
 
-      {/* Script output */}
-      {script && !loading && (
-        <div style={{
-          background: activeGenre ? activeGenre.tint : 'transparent',
-        }}>
-          {/* Script header */}
+      {/* Generated screenplay */}
+      {script && genre && (
+        <div style={{ marginBottom: 20 }}>
+
+          {/* Script display */}
           <div style={{
-            display: 'flex', justifyContent: 'space-between',
-            alignItems: 'center', marginBottom: 12,
+            background: 'var(--bg-card)',
+            border: `1px solid ${genre.color}44`,
+            borderTop: `3px solid ${genre.color}`,
+            borderRadius: '0 0 16px 16px',
+            padding: '20px',
+            marginBottom: 14,
+            position: 'relative',
           }}>
-            <div>
-              <span style={{
-                fontSize: 10, fontWeight: 700, color: 'var(--text-3)',
-                textTransform: 'uppercase', letterSpacing: '0.08em',
-              }}>
-                {activeGenre?.emoji} {activeGenre?.name} · KickoffTo Director Mode
-              </span>
-            </div>
-            <button onClick={shareScript} style={{
-              background: 'var(--bg-elevated)',
-              border: `1px solid ${copied ? 'var(--green)' : 'var(--border)'}`,
-              color: copied ? 'var(--green)' : 'var(--text-3)',
-              borderRadius: 8, padding: '6px 12px', fontSize: 11,
-              fontWeight: 600, cursor: 'pointer',
-              transition: 'all 0.2s',
+            {/* Genre badge */}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              marginBottom: 16,
             }}>
-              {copied ? '✓ Link copied!' : '🔗 Share script'}
-            </button>
-          </div>
-
-          {/* Screenplay */}
-          <div style={{
-            background: '#0d0d0d',
-            border: '1px solid var(--border)',
-            borderRadius: 12, padding: '24px 20px',
-            fontFamily: 'var(--font-mono)',
-            fontSize: 13, lineHeight: 1.8,
-            color: '#e0e0e0',
-            whiteSpace: 'pre-wrap',
-            wordBreak: 'break-word',
-          }}>
-            {script}
-          </div>
-
-          {/* Try another genre */}
-          <div style={{
-            display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap',
-          }}>
-            {GENRES.filter(g => g.id !== selectedGenre).slice(0, 3).map(g => (
+              <span style={{ fontSize: 20 }}>{genre.emoji}</span>
+              <div>
+                <div style={{
+                  fontSize: 12, fontWeight: 800,
+                  color: genre.color,
+                }}>
+                  {genre.name.toUpperCase()} MODE
+                </div>
+                <div style={{ fontSize: 10, color: 'var(--text-3)' }}>
+                  Voice: {genre.voice} · {cached ? '🟡 Cached' : '🟢 Generated now'}
+                </div>
+              </div>
               <button
-                key={g.id}
-                onClick={() => generateScript(g.id)}
+                onClick={() => generate(genre.id)}
                 style={{
+                  marginLeft: 'auto',
                   background: 'var(--bg-elevated)',
                   border: '1px solid var(--border)',
-                  borderRadius: 8, padding: '6px 12px',
+                  borderRadius: 8, padding: '5px 10px',
                   fontSize: 11, color: 'var(--text-2)',
                   cursor: 'pointer',
                 }}
               >
-                {g.emoji} Try as {g.name}
+                🔄 Regenerate
               </button>
-            ))}
+            </div>
+
+            <div style={{
+              fontSize: 14, color: 'var(--text)',
+              lineHeight: 1.8, whiteSpace: 'pre-wrap',
+              fontFamily: 'Georgia, serif',
+            }}>
+              {script}
+            </div>
           </div>
+
+          {/* TTS controls */}
+          <div style={{
+            background: 'var(--bg-card)', border: '1px solid var(--border)',
+            borderRadius: 14, padding: '14px 16px',
+          }}>
+            <div style={{
+              display: 'flex', alignItems: 'center',
+              gap: 10, marginBottom: audioUrl ? 12 : 0,
+            }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginBottom: 2 }}>
+                  🎙️ Narrate this screenplay
+                </div>
+                <div style={{ fontSize: 10, color: 'var(--text-3)' }}>
+                  {genre.voice} voice · Powered by Unreal Speech
+                </div>
+              </div>
+
+              <button
+                onClick={narrate}
+                disabled={audioLoading}
+                style={{
+                  background: audioLoading
+                    ? 'var(--bg-elevated)'
+                    : `linear-gradient(135deg, ${genre.color}, ${genre.color}cc)`,
+                  color: audioLoading ? 'var(--text-3)' : '#fff',
+                  border: 'none', borderRadius: 10,
+                  padding: '10px 18px', fontSize: 13,
+                  fontWeight: 700, cursor: audioLoading ? 'not-allowed' : 'pointer',
+                  whiteSpace: 'nowrap',
+                  boxShadow: audioLoading ? 'none' : `0 4px 16px ${genre.color}44`,
+                }}
+              >
+                {audioLoading ? '⏳ Generating audio...' : '▶ Generate audio'}
+              </button>
+            </div>
+
+            {audioError && (
+              <div style={{
+                fontSize: 11, color: '#f87171', marginTop: 8,
+                background: 'rgba(220,38,38,0.08)',
+                borderRadius: 8, padding: '8px 12px',
+              }}>
+                {audioError.includes('No Unreal Speech')
+                  ? '⚙️ Add UNREAL_SPEECH_API_KEY_1 to Vercel environment variables'
+                  : audioError}
+              </div>
+            )}
+
+            {/* Audio player */}
+            {audioUrl && (
+              <div style={{ marginTop: 12 }}>
+                <audio
+                  ref={audioRef}
+                  src={audioUrl}
+                  onPlay={() => setIsPlaying(true)}
+                  onPause={() => setIsPlaying(false)}
+                  onEnded={() => setIsPlaying(false)}
+                  style={{ display: 'none' }}
+                />
+
+                <div style={{
+                  background: 'var(--bg-elevated)',
+                  border: `1px solid ${genre.color}33`,
+                  borderRadius: 12, padding: '12px 14px',
+                  display: 'flex', alignItems: 'center', gap: 12,
+                }}>
+                  {/* Play/pause */}
+                  <button
+                    onClick={togglePlay}
+                    style={{
+                      width: 44, height: 44, borderRadius: '50%',
+                      background: `linear-gradient(135deg, ${genre.color}, ${genre.color}cc)`,
+                      border: 'none', cursor: 'pointer', flexShrink: 0,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 18, color: '#fff',
+                      boxShadow: `0 2px 12px ${genre.color}55`,
+                    }}
+                  >
+                    {isPlaying ? '⏸' : '▶'}
+                  </button>
+
+                  <div style={{ flex: 1 }}>
+                    <div style={{
+                      fontSize: 12, fontWeight: 700, color: 'var(--text)', marginBottom: 2,
+                    }}>
+                      {genre.emoji} {genre.name} Narration
+                    </div>
+                    <div style={{ fontSize: 10, color: 'var(--text-3)' }}>
+                      {genre.voice} · Unreal Speech
+                      {isPlaying && (
+                        <span style={{ marginLeft: 8, color: genre.color }}>
+                          ● Playing...
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Download */}
+                  <a
+                    href={audioUrl}
+                    download={`kickoffto-director-${genre.id}.mp3`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      background: 'var(--bg-card)',
+                      border: '1px solid var(--border)',
+                      borderRadius: 8, padding: '6px 10px',
+                      fontSize: 11, color: 'var(--text-2)',
+                      textDecoration: 'none', flexShrink: 0,
+                    }}
+                  >
+                    ↓ MP3
+                  </a>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Attribution required by Unreal Speech free plan */}
+          <p style={{
+            fontSize: 9, color: 'var(--text-3)',
+            textAlign: 'center', marginTop: 8,
+          }}>
+            Audio by <a href="https://unrealspeech.com" target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: 'var(--text-3)' }}>unrealspeech.com</a>
+          </p>
         </div>
       )}
 
-      {/* Match events summary */}
-      {!script && !loading && (
+      {/* Match events */}
+      {!script && !loading && match.events?.length > 0 && (
         <div style={{
           background: 'var(--bg-card)', border: '1px solid var(--border)',
           borderRadius: 12, padding: 16,
@@ -281,10 +481,10 @@ export function DirectorModeClient({ match, initialGenre }: DirectorModeClientPr
             ))}
           </div>
           <p style={{
-            fontSize: 11, color: 'var(--text-3)', marginTop: 14,
-            fontStyle: 'italic',
+            fontSize: 11, color: 'var(--text-3)',
+            marginTop: 14, fontStyle: 'italic',
           }}>
-            Pick a genre above — Groq will turn these events into a screenplay
+            Pick a genre above — Groq turns these events into a screenplay
           </p>
         </div>
       )}
