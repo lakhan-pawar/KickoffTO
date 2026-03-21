@@ -1,5 +1,5 @@
 'use client'
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Navbar } from '@/components/ui/Navbar'
 import { BottomNav } from '@/components/ui/BottomNav'
 import Link from 'next/link'
@@ -71,6 +71,32 @@ export default function ChantPage() {
   const [selectedVoice, setSelectedVoice] = useState('stadium')
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([])
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null)
+
+  // Stop TTS when user navigates away from chant page
+  useEffect(() => {
+    return () => {
+      // Cleanup: cancel speech when component unmounts
+      if (typeof window !== 'undefined' && window.speechSynthesis) {
+        window.speechSynthesis.cancel()
+      }
+    }
+  }, [])
+
+  // Also add to the stopAudio function — make sure it's called on route change
+  // Add router.events listener if using Next.js app router:
+  useEffect(() => {
+    function handleRouteChange() {
+      if (typeof window !== 'undefined' && window.speechSynthesis) {
+        window.speechSynthesis.cancel()
+        setIsPlaying(false)
+      }
+    }
+    window.addEventListener('beforeunload', handleRouteChange)
+    return () => {
+      window.removeEventListener('beforeunload', handleRouteChange)
+      handleRouteChange() // Also run on component unmount
+    }
+  }, [])
 
   const selectedTeam = TEAMS.find(t => t.code === team)!
 
