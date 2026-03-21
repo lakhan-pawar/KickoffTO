@@ -11,10 +11,10 @@ export function Ticker({ segments }: { segments: string[] }) {
     const el = innerRef.current
     if (!el) return
     const id = setTimeout(() => {
-      const half = el.scrollWidth / 2
+      const unit = el.scrollWidth / 3
       function tick() {
         posRef.current -= 0.55
-        if (el && Math.abs(posRef.current) >= half) posRef.current = 0
+        if (el && Math.abs(posRef.current) >= unit) posRef.current = 0
         if (el) el.style.transform = `translateX(${posRef.current}px)`
         rafRef.current = requestAnimationFrame(tick)
       }
@@ -23,7 +23,7 @@ export function Ticker({ segments }: { segments: string[] }) {
     return () => { clearTimeout(id); cancelAnimationFrame(rafRef.current) }
   }, [segments])
 
-  const doubled = [...segments, ...segments]
+  const tripled = [...segments, ...segments, ...segments]
 
   return (
     <div style={{
@@ -35,10 +35,10 @@ export function Ticker({ segments }: { segments: string[] }) {
         display:'inline-flex', alignItems:'center',
         willChange:'transform', whiteSpace:'nowrap',
       }}>
-        {doubled.map((seg, i) => (
+        {tripled.map((seg, i) => (
           <span key={i} style={{
             display:'inline-block', fontSize:11,
-            color:'var(--text-3)', padding:'0 28px',
+            color:'var(--text-3)', padding:'0 60px',
             borderRight:'1px solid var(--border)',
           }}>
             {seg}

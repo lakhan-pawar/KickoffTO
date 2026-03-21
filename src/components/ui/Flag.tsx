@@ -37,10 +37,12 @@ export function Flag({ code, emoji = '🏳️', size = 28, style }: FlagProps) {
   if (!iso) {
     return <span style={{ fontSize: size, lineHeight: 1, ...style }}>{emoji}</span>
   }
-  const w = Math.round(size * 1.5)
+  const requestedW = Math.round(size * 1.5)
+  // flagcdn supported widths: 20, 40, 80, 160, 256
+  const w = requestedW <= 20 ? 20 : requestedW <= 40 ? 40 : requestedW <= 80 ? 80 : 160
   return (
     <img
-      src={`https://flagcdn.com/w${Math.min(w * 2, 160)}/${iso}.png`}
+      src={`https://flagcdn.com/w${w}/${iso}.png`}
       alt={code}
       width={w}
       height={size}
