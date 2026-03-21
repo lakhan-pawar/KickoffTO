@@ -5,7 +5,11 @@ import { CharacterCard } from '@/components/ui/CharacterCard'
 import { BottomNav } from '@/components/ui/BottomNav'
 import { MiniPlayer } from '@/components/ui/MiniPlayer'
 import { CHARACTERS } from '@/lib/constants'
-import { getLiveFixtures } from '@/lib/football'
+import { getLiveFixtures, getUpcomingFixtures } from '@/lib/football'
+import { mapApiFootballFixture } from '@/lib/football-api'
+import { Countdown } from '@/components/ui/Countdown'
+import { AdUnit } from '@/components/ads/AdUnit'
+import type { Match } from '@/types'
 import Link from 'next/link'
 
 // Revalidate every 30 seconds for live data
@@ -81,17 +85,26 @@ const MOCK_UPCOMING_MATCHES = [
 const PHASE1_CHARACTERS = CHARACTERS.filter(c => c.phase === 1)
 
 export default async function HomePage() {
-  // Attempt to get live data — falls back to mock on error
-  let liveMatches: typeof MOCK_UPCOMING_MATCHES = []
-  let upcomingMatches = MOCK_UPCOMING_MATCHES
+  let liveMatches: Match[] = []
+  let upcomingMatches: Match[] = MOCK_UPCOMING_MATCHES
 
   try {
-    await getLiveFixtures()
-    // TODO: map API response to Match type when tournament begins
-    // For now use mock data
-  } catch {
-    // Use mock data — silent fallback
-  }
+    const liveData = await getLiveFixtures() as any
+    if (liveData?.response?.length > 0) {
+      liveMatches = liveData.response
+        .map(mapApiFootballFixture)
+        .filter((m: Match) => m.status === 'live')
+    }
+  } catch {}
+
+  try {
+    if (liveMatches.length === 0) {
+      const upcomingData = await getUpcomingFixtures(3) as any
+      if (upcomingData?.response?.length > 0) {
+        upcomingMatches = upcomingData.response.map(mapApiFootballFixture)
+      }
+    }
+  } catch {}
 
   const hasLive = liveMatches.length > 0
   const displayMatches = hasLive ? liveMatches : upcomingMatches
@@ -106,7 +119,7 @@ export default async function HomePage() {
       <Navbar isLive={hasLive} />
       <Ticker segments={[
         ...TICKER_SEGMENTS,
-        `🏆 WC2026 starts in ${daysUntil} days`,
+        '🏆 WC2026 starts June 11',
       ]} />
 
       <main style={{ maxWidth: 1200, margin: '0 auto', padding: '0 16px 100px' }}>
@@ -126,6 +139,9 @@ export default async function HomePage() {
             lineHeight: 1.6, maxWidth: 480, margin: '0 auto 28px' }}>
             16 AI characters. Live match rooms. Fan games. Your WC2026 in one place.
           </p>
+          <div style={{ marginBottom: 40 }}>
+            <Countdown />
+          </div>
           <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 16 }}>
             <Link href="/characters" style={{
               background: 'var(--green)', color: '#fff', textDecoration: 'none',
@@ -160,8 +176,8 @@ export default async function HomePage() {
             ].map(card => (
               <div key={card.label} style={{
                 background: 'var(--bg-card)', border: '1px solid var(--border)',
+                borderRadius: 12, padding: '12px 14px',
                 borderLeft: `3px solid ${card.accent}`,
-                borderRadius: '0 10px 10px 0', padding: '12px 14px',
               }}>
                 <div style={{
                   fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 800,
@@ -174,6 +190,8 @@ export default async function HomePage() {
             ))}
           </div>
         </section>
+
+        <AdUnit slot="1234567890" format="auto" />
 
         {/* Matches */}
         <section style={{ marginBottom: 32 }}>
@@ -192,6 +210,8 @@ export default async function HomePage() {
             ))}
           </div>
         </section>
+
+        <AdUnit slot="0987654321" format="rectangle" />
 
         {/* Character spotlight */}
         <section style={{
