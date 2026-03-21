@@ -174,10 +174,12 @@ export function ChatPanel({ character, compact }: ChatPanelProps) {
 
         {/* Input — sticky at bottom */}
         <div style={{
-          padding: '10px 14px 12px',
+          padding: '10px 14px',
+          paddingBottom: 'max(12px, calc(env(safe-area-inset-bottom) + 12px))',
           borderTop: '1px solid var(--border)',
           background: 'var(--bg)',
           display: 'flex', gap: 8, alignItems: 'flex-end',
+          flexShrink: 0,
         }}>
           <input
             type="text"

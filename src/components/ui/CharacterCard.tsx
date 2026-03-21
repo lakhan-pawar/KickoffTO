@@ -2,20 +2,6 @@
 import Link from 'next/link'
 import type { Character } from '@/types'
 
-const EXPERTISE: Record<string, string[]> = {
-  'el-maestro':    ['Tactics', 'Formation', 'Strategy'],
-  'xg-oracle':     ['xG', 'Stats', 'Data'],
-  'fpl-guru':      ['Fantasy', 'FPL', 'Picks'],
-  'var-review':    ['Rules', 'VAR', 'Decisions'],
-  'the-archive':   ['History', 'Records', 'Lore'],
-  'talentspotter': ['Scouting', 'Players', 'Transfers'],
-  'the-voice':     ['Commentary', 'Drama', 'Live'],
-  'ultra':         ['Passion', 'Fan culture', 'Banter'],
-  'coach-believe': ['Motivation', 'Mindset', 'Inspire'],
-  'chef-fury':     ['Opinions', 'Takes', 'Rants'],
-  'aria-9':        ['AI', 'Systems', 'Data'],
-  'multiverse':    ['What-if', 'Alternate', 'Timeline'],
-}
 
 interface CharacterCardProps {
   character: Character
@@ -35,7 +21,7 @@ export function CharacterCard({ character, size = 'md' }: CharacterCardProps) {
       style={{ textDecoration: 'none' }}>
       <div style={{
         width: dims.w, flexShrink: 0,
-        borderRadius: 16, overflow: 'hidden',
+        borderRadius: 16, overflow: 'hidden', height: dims.w * 1.4, // fixed aspect ratio
         background: character.color,
         boxShadow: `0 4px 20px ${character.color}55`,
         position: 'relative',
@@ -54,32 +40,27 @@ export function CharacterCard({ character, size = 'md' }: CharacterCardProps) {
         el.style.boxShadow = `0 4px 20px ${character.color}55`
       }}>
 
-        {/* Large ghost monogram watermark */}
+        {/* Large ghost watermark */}
         <div style={{
           position: 'absolute', inset: 0,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontFamily: 'var(--font-display)', fontWeight: 900,
-          fontSize: dims.mono * 2.2, color: 'rgba(255,255,255,0.07)',
-          letterSpacing: -2, pointerEvents: 'none',
-          userSelect: 'none',
+          fontSize: dims.mono * 2.5, opacity: 0.1, // Adjusted for emoji
+          pointerEvents: 'none', userSelect: 'none',
         }}>
-          {character.monogram}
+          {character.icon ?? character.monogram}
         </div>
 
         {/* Content */}
         <div style={{ padding: '16px 12px 14px', position: 'relative' }}>
-          {/* Monogram avatar */}
+          {/* Icon avatar replacing Monogram */}
           <div style={{
             width: dims.mono, height: dims.mono, borderRadius: 10,
-            background: 'rgba(0,0,0,0.35)',
-            backdropFilter: 'blur(8px)',
+            background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(8px)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontFamily: 'var(--font-display)', fontWeight: 900,
-            fontSize: dims.monoFont, color: 'rgba(255,255,255,0.9)',
-            letterSpacing: -0.5, marginBottom: 10,
-            border: '1px solid rgba(255,255,255,0.15)',
+            fontSize: dims.monoFont * 1.4, // larger for emoji
+            marginBottom: 10, border: '1px solid rgba(255,255,255,0.15)',
           }}>
-            {character.monogram}
+            {character.icon ?? character.monogram}
           </div>
 
           <div style={{
@@ -98,30 +79,21 @@ export function CharacterCard({ character, size = 'md' }: CharacterCardProps) {
             {character.role}
           </div>
 
-          {(EXPERTISE[character.id] ?? []).length > 0 && (
-            <div style={{
-              display: 'flex', gap: 3, flexWrap: 'wrap', marginTop: 5, marginBottom: 8,
-            }}>
-              {(EXPERTISE[character.id] ?? []).slice(0, 2).map(tag => (
-                <span key={tag} className="expertise-tag">{tag}</span>
-              ))}
-            </div>
-          )}
-
+          {/* Chat CTA replacing tags */}
           {character.phase === 1 && (
             <div style={{
-              display: 'inline-flex', alignItems: 'center', gap: 4,
-              background: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(8px)',
-              borderRadius: 99, padding: '3px 8px',
-              border: '1px solid rgba(255,255,255,0.12)',
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              background: '#ffffff', borderRadius: 99,
+              padding: '6px 12px', marginTop: 8,
+              boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
             }}>
               <span style={{
-                width: 5, height: 5, borderRadius: '50%',
+                width: 6, height: 6, borderRadius: '50%',
                 background: '#4ade80', display: 'inline-block',
                 animation: 'livePulse 1.5s ease-in-out infinite',
               }} />
-              <span style={{ fontSize: 9, color: '#4ade80', fontWeight: 700 }}>
-                Online
+              <span style={{ fontSize: 12, color: '#000', fontWeight: 800 }}>
+                Chat &rarr;
               </span>
             </div>
           )}

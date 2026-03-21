@@ -83,7 +83,8 @@ export type CharacterPhase = 1 | 2 | 3
 export interface Character {
   id: string
   name: string
-  monogram: string   // 2-letter e.g. "EM"
+  monogram: string
+  icon?: string   // 2-letter e.g. "EM"
   role: string
   tier: CharacterTier
   phase: CharacterPhase

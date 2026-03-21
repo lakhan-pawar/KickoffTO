@@ -140,18 +140,33 @@ export function TradingCard({ player }: TradingCardProps) {
     let cancelled = false
     async function fetchPhoto() {
       setLoadingPhoto(true)
-      try {
-        const res = await fetch(`/api/cards/${player.id}/photo`)
-        if (!res.ok) throw new Error('No photo')
-        const data = await res.json()
-        const url = data.cutout ?? data.thumb ?? null
-        if (!cancelled && url) {
-          setProxiedUrl(`/api/proxy/image?url=${encodeURIComponent(url)}`)
-        } else if (!cancelled) {
+
+      // Set a 4-second timeout — if photo doesn't load, show avatar
+      const timeout = setTimeout(() => {
+        if (!cancelled && loadingPhoto) {
           setPhotoFailed(true)
           setLoadingPhoto(false)
         }
+      }, 4000)
+
+      try {
+        const res = await fetch(`/api/cards/${player.id}/photo`, {
+          signal: AbortSignal.timeout(3500),
+        })
+
+        if (!res.ok) throw new Error(`API error ${res.status}`)
+        const data = await res.json()
+        const url = data.cutout ?? data.thumb ?? null
+
+        clearTimeout(timeout)
+
+        if (!cancelled && url) {
+          setProxiedUrl(`/api/proxy/image?url=${encodeURIComponent(url)}`)
+        } else {
+          if (!cancelled) { setPhotoFailed(true); setLoadingPhoto(false) }
+        }
       } catch {
+        clearTimeout(timeout)
         if (!cancelled) { setPhotoFailed(true); setLoadingPhoto(false) }
       }
     }
@@ -161,11 +176,12 @@ export function TradingCard({ player }: TradingCardProps) {
 
   // Draw front canvas
   useEffect(() => {
-    if (loadingPhoto && !photoFailed) return
     const canvas = canvasRef.current
     if (!canvas) return
     const ctx = canvas.getContext('2d')
     if (!ctx) return
+
+    if (loadingPhoto && !photoFailed) return // Still loading, wait
 
     const W = 300, H = 420
     canvas.width = W
@@ -335,6 +351,7 @@ export function TradingCard({ player }: TradingCardProps) {
       img.onerror = () => { setPhotoFailed(true); setLoadingPhoto(false); draw() }
       img.src = proxiedUrl
     } else {
+      // Draw immediately with avatar — no more infinite loading
       draw()
     }
   }, [player, proxiedUrl, photoFailed, loadingPhoto, kitColor, accentColor, rarity, serial, playerNumber])

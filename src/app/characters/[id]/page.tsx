@@ -62,8 +62,9 @@ export default function CharacterPage() {
           fontSize: 88, color: 'rgba(255,255,255,0.07)',
           letterSpacing: -4, lineHeight: 1,
           pointerEvents: 'none', userSelect: 'none',
+          opacity: 0.2, // Boost for emoji
         }}>
-          {character.monogram}
+          {character.icon ?? character.monogram}
         </div>
 
         {/* Top row: back + identity + status */}
@@ -88,11 +89,10 @@ export default function CharacterPage() {
             backdropFilter: 'blur(10px)',
             border: '1px solid rgba(255,255,255,0.15)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontFamily: 'var(--font-display)', fontWeight: 900,
-            fontSize: 14, color: 'rgba(255,255,255,0.92)',
+            fontSize: 20, // larger for emoji
             flexShrink: 0,
           }}>
-            {character.monogram}
+            {character.icon ?? character.monogram}
           </div>
 
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -210,6 +210,7 @@ export default function CharacterPage() {
         display: 'flex',
         flexDirection: 'column',
         minHeight: 0,
+        marginBottom: 56, // BottomNav height
       }}>
         <ChatPanel character={character} compact />
       </div>

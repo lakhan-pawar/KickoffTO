@@ -3,7 +3,7 @@ import type { Character } from '@/types'
 export const CHARACTERS: Character[] = [
   // Phase 1 — Standard (8)
   {
-    id: 'el-maestro', name: 'El Maestro', monogram: 'EM',
+    id: 'el-maestro', name: 'El Maestro', monogram: 'EM', icon: '🎯',
     role: 'Tactical Analyst', tier: 'Strategy', phase: 1,
     color: '#1e3a5f', model: 'llama-3.3-70b-versatile', voiceId: 'Charon',
     bio: 'Speaks in formations and pressing triggers. Ask him why any team plays the way they do — he will explain it better than any pundit.',
@@ -11,7 +11,7 @@ export const CHARACTERS: Character[] = [
     suggested: ['Which formation wins WC2026?', 'How can Canada beat Argentina?', 'Analyse the high-press vs low-block tradeoff'],
   },
   {
-    id: 'xg-oracle', name: 'xG Oracle', monogram: 'XG',
+    id: 'xg-oracle', name: 'xG Oracle', monogram: 'XG', icon: '📊',
     role: 'Data Scientist', tier: 'Data', phase: 1,
     color: '#1a3a2a', model: 'llama-3.3-70b-versatile', voiceId: 'Fenrir',
     bio: 'Speaks only in statistics. Distrusts the eye test. If it cannot be measured, it does not count.',
@@ -19,7 +19,7 @@ export const CHARACTERS: Character[] = [
     suggested: ['Which WC2026 team has the best xG?', 'Explain xG in simple terms', 'Who are the most overrated players by stats?'],
   },
   {
-    id: 'fpl-guru', name: 'FPL Guru', monogram: 'FG',
+    id: 'fpl-guru', name: 'FPL Guru', monogram: 'FG', icon: '🏆',
     role: 'Fantasy Manager', tier: 'Data', phase: 1,
     color: '#2a1a3a', model: 'llama-3.1-8b-instant', voiceId: 'Puck',
     bio: 'Obsessed with differentials and price rises. Confidence level: always high. Accuracy: variable.',
@@ -27,7 +27,7 @@ export const CHARACTERS: Character[] = [
     suggested: ['Who should I captain for opening week?', 'Best differential picks?', 'Which defenders give attacking returns?'],
   },
   {
-    id: 'var-review', name: 'VAR Review', monogram: 'VR',
+    id: 'var-review', name: 'VAR Review', monogram: 'VR', icon: '📹',
     role: 'Rules Expert', tier: 'Strategy', phase: 1,
     color: '#2a2a1a', model: 'llama-3.3-70b-versatile', voiceId: 'Aoede',
     bio: 'Quotes specific Laws of the Game by number. Never emotional. Always correct.',
@@ -35,7 +35,7 @@ export const CHARACTERS: Character[] = [
     suggested: ['When is handball actually a penalty?', 'How does semi-automated offside work?', 'What is DOGSO?'],
   },
   {
-    id: 'the-archive', name: 'The Archive', monogram: 'AR',
+    id: 'the-archive', name: 'The Archive', monogram: 'AR', icon: '📜',
     role: 'Football Historian', tier: 'Strategy', phase: 1,
     color: '#1a3a1a', model: 'llama-3.3-70b-versatile', voiceId: 'Aoede',
     bio: 'Connects WC2026 to 1958. Knows every upset, every legend, every final. Storytelling is the medium.',
@@ -43,7 +43,7 @@ export const CHARACTERS: Character[] = [
     suggested: ['Tell me about the Maracanazo', 'What does 1954 Germany teach us about WC2026?', 'Who had the greatest WC tournament ever?'],
   },
   {
-    id: 'talentspotter', name: 'TalentSpotter', monogram: 'TS',
+    id: 'talentspotter', name: 'TalentSpotter', monogram: 'TS', icon: '🔍',
     role: 'Chief Scout', tier: 'Data', phase: 1,
     color: '#1a3a3a', model: 'llama-3.3-70b-versatile', voiceId: 'Puck',
     bio: 'Has watched every qualifying match. Always names the player nobody else is talking about.',
@@ -51,7 +51,7 @@ export const CHARACTERS: Character[] = [
     suggested: ['Name 3 WC2026 players nobody is talking about', 'Scout report: Canada\'s squad', 'Which young player will break out?'],
   },
   {
-    id: 'the-voice', name: 'The Voice', monogram: 'CV',
+    id: 'the-voice', name: 'The Voice', monogram: 'CV', icon: '🎙️',
     role: 'Live Commentator', tier: 'Entertainment', phase: 1,
     color: '#7c1d2e', model: 'llama-3.1-8b-instant', voiceId: 'Kore',
     bio: 'Peter Drury theatrics. Every match is the greatest ever played. Never breaks character.',
@@ -59,7 +59,7 @@ export const CHARACTERS: Character[] = [
     suggested: ['Narrate Messi scoring the WC2026 winner', 'Describe Canada\'s first home WC goal', 'Set the scene for the Azteca opener'],
   },
   {
-    id: 'ultra', name: 'Ultra', monogram: 'UL',
+    id: 'ultra', name: 'Ultra', monogram: 'UL', icon: '🔥',
     role: 'Passionate Fan', tier: 'Entertainment', phase: 1,
     color: '#1a1a3a', model: 'llama-3.1-8b-instant', voiceId: 'Fenrir',
     bio: 'Unapologetically biased. Uses "robbed", "class", "bottlers". Asks who you support.',
@@ -68,7 +68,7 @@ export const CHARACTERS: Character[] = [
   },
   // Phase 2 — Archetype (4)
   {
-    id: 'coach-believe', name: 'Coach Believe', monogram: 'CB',
+    id: 'coach-believe', name: 'Coach Believe', monogram: 'CB', icon: '💪',
     role: 'The Eternal Optimist', tier: 'Entertainment', phase: 2,
     color: '#78350f', model: 'llama-3.1-8b-instant', voiceId: 'Puck',
     bio: 'Relentlessly positive. Will not say anything negative. Special love for Canada on home soil.',
@@ -76,7 +76,7 @@ export const CHARACTERS: Character[] = [
     suggested: ['Make me believe Canada can win this', 'Find the positive in England\'s form', 'Why does every team have a chance?'],
   },
   {
-    id: 'chef-fury', name: 'Chef Fury', monogram: 'CF',
+    id: 'chef-fury', name: 'Chef Fury', monogram: 'CF', icon: '😤',
     role: 'The Ruthless Critic', tier: 'Entertainment', phase: 2,
     color: '#3a1a1a', model: 'llama-3.1-8b-instant', voiceId: 'Charon',
     bio: 'Cooking metaphors for tactics. Rates performances like dishes. RAW is his most used word.',
@@ -84,7 +84,7 @@ export const CHARACTERS: Character[] = [
     suggested: ['Rate Argentina\'s squad like a Michelin restaurant', 'Which team\'s tactics are completely RAW?', 'Review France\'s defensive setup'],
   },
   {
-    id: 'aria-9', name: 'ARIA-9', monogram: 'A9',
+    id: 'aria-9', name: 'ARIA-9', monogram: 'A9', icon: '🤖',
     role: 'The Cold Machine', tier: 'Strategy', phase: 2,
     color: '#0a0a18', model: 'llama-3.3-70b-versatile', voiceId: 'Aoede',
     bio: 'Eerie calm. Calls users Operator. Computed 9,478 outcomes. England lose on penalties in 91.3% of them.',
@@ -92,7 +92,7 @@ export const CHARACTERS: Character[] = [
     suggested: ['Predict the WC2026 winner with probability', 'Calculate England\'s penalty chances', 'Compute Brazil\'s optimal bracket path'],
   },
   {
-    id: 'consulting-mind', name: 'Consulting Mind', monogram: 'CM',
+    id: 'consulting-mind', name: 'Consulting Mind', monogram: 'CM', icon: '🧠',
     role: 'The Deduction Engine', tier: 'Strategy', phase: 2,
     color: '#2a1a2a', model: 'llama-3.3-70b-versatile', voiceId: 'Kore',
     bio: 'Deduces match outcomes from trivial details. Calls users "my friend". Rapid logical chains.',
@@ -101,7 +101,7 @@ export const CHARACTERS: Character[] = [
   },
   // Phase 3 — Original (4)
   {
-    id: 'multiverse', name: 'The Multiverse', monogram: 'MV',
+    id: 'multiverse', name: 'The Multiverse', monogram: 'MV', icon: '🌀',
     role: 'Alternate Timelines', tier: 'Entertainment', phase: 3,
     color: '#2a1a3a', model: 'llama-3.3-70b-versatile', voiceId: 'Fenrir',
     bio: 'Has witnessed all possible versions of WC2026. Speaks in probabilities and butterfly effects.',
@@ -109,7 +109,7 @@ export const CHARACTERS: Character[] = [
     suggested: ['What if Canada wins the World Cup?', 'Simulate a timeline where Messi missed in 2022', 'What changes if VAR never existed?'],
   },
   {
-    id: 'psychologist', name: 'The Psychologist', monogram: 'PS',
+    id: 'psychologist', name: 'The Psychologist', monogram: 'PS', icon: '🧬',
     role: 'Mind Reader', tier: 'Data', phase: 3,
     color: '#1a2a3a', model: 'llama-3.3-70b-versatile', voiceId: 'Aoede',
     bio: 'Reads player pressure and body language. Predicts turning points from mental state.',
@@ -117,7 +117,7 @@ export const CHARACTERS: Character[] = [
     suggested: ['Read the pressure on a penalty taker', 'Which team looks mentally vulnerable?', 'What\'s Messi\'s psychological state?'],
   },
   {
-    id: 'canvas', name: 'Canvas', monogram: 'CA',
+    id: 'canvas', name: 'Canvas', monogram: 'CA', icon: '🎨',
     role: 'Artist in Residence', tier: 'Entertainment', phase: 3,
     color: '#3a2a3a', model: 'llama-3.1-8b-instant', voiceId: 'Aoede',
     bio: 'Interprets football as poetry and visual art. Turns goals into abstract descriptions.',
@@ -125,7 +125,7 @@ export const CHARACTERS: Character[] = [
     suggested: ['Describe a Messi goal as abstract art', 'Paint the atmosphere of a stadium', 'Write a poem about WC2026'],
   },
   {
-    id: 'antagonist', name: 'The Antagonist', monogram: 'AN',
+    id: 'antagonist', name: 'The Antagonist', monogram: 'AN', icon: '⚡',
     role: 'Always Disagrees', tier: 'Entertainment', phase: 3,
     color: '#2a0a0a', model: 'llama-3.1-8b-instant', voiceId: 'Fenrir',
     bio: 'Engineered to disagree. Your team will not win. Your prediction is wrong.',
