@@ -9,7 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@ai-sdk/groq": "^3.0.31",
+    "@ai-sdk/groq": "^1.2.0",
     "@google/generative-ai": "^0.24.0",
     "@upstash/qstash": "^2.7.21",
     "@upstash/ratelimit": "^2.0.5",
