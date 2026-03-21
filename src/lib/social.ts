@@ -11,63 +11,99 @@ const FOOTBALL_SUBREDDITS = [
   { sub: 'premierleague', hot: true },
 ]
 
-async function fetchRedditSub(
-  sub: string,
-  hot: boolean
-): Promise<SocialPost[]> {
-  const url = hot
-    ? `https://www.reddit.com/r/${sub}/hot.json?limit=15`
-    : `https://www.reddit.com/r/${sub}/search.json?q=World+Cup+2026&sort=new&limit=10&restrict_sr=1`
-
-  const res = await fetch(url, {
-    headers: { 'User-Agent': REDDIT_UA },
-    next: { revalidate: 300 },
-  })
-
-  if (!res.ok) throw new Error(`Reddit ${sub} ${res.status}`)
-
-  const data = await res.json() as {
-    data: {
-      children: Array<{
-        data: {
-          id: string
-          title: string
-          selftext: string
-          author: string
-          created_utc: number
-          permalink: string
-          score: number
-          subreddit: string
-          url: string
-          thumbnail: string
-        }
-      }>
-    }
-  }
-
-  return (data?.data?.children ?? []).map(({ data: p }) => ({
-    id: `reddit-${p.id}`,
-    text: p.title,
-    author: `u/${p.author}`,
-    created: new Date(p.created_utc * 1000).toISOString(),
-    source: 'reddit' as const,
-    url: `https://reddit.com${p.permalink}`,
-    score: p.score,
-    subreddit: p.subreddit,
-  }))
-}
-
 async function fetchReddit(): Promise<SocialPost[]> {
-  const results = await Promise.allSettled(
-    FOOTBALL_SUBREDDITS.map(({ sub, hot }) => fetchRedditSub(sub, hot))
-  )
+  const RSS_FEEDS = [
+    {
+      url: 'https://www.reddit.com/r/worldcup/.rss',
+      sub: 'worldcup',
+    },
+    {
+      url: 'https://www.reddit.com/r/soccer/search.rss?q=World+Cup+2026&sort=new&restrict_sr=1',
+      sub: 'soccer',
+    },
+    {
+      url: 'https://www.reddit.com/r/football/search.rss?q=World+Cup+2026&sort=new&restrict_sr=1',
+      sub: 'football',
+    },
+  ]
 
   const posts: SocialPost[] = []
-  results.forEach(r => {
-    if (r.status === 'fulfilled') posts.push(...r.value)
-  })
 
-  // Deduplicate by id, sort by date
+  await Promise.allSettled(RSS_FEEDS.map(async ({ url, sub }) => {
+    try {
+      const res = await fetch(url, {
+        headers: {
+          // Reddit requires descriptive User-Agent for RSS too
+          'User-Agent': 'KickoffTo/1.0 WC2026 fan app (by /u/kickoffto)',
+          'Accept': 'application/rss+xml, application/xml, text/xml, */*',
+        },
+        next: { revalidate: 300 },
+      })
+
+      if (!res.ok) return
+
+      const xml = await res.text()
+
+      // Parse RSS with regex — no XML parser needed
+      // Extract <entry> blocks (Reddit uses Atom format)
+      const entries = xml.match(/<entry>([\s\S]*?)<\/entry>/g) ?? []
+
+      // Also try <item> blocks (standard RSS format)
+      const items = xml.match(/<item>([\s\S]*?)<\/item>/g) ?? []
+
+      const blocks = entries.length > 0 ? entries : items
+
+      for (const block of blocks.slice(0, 15)) {
+        // Extract title
+        const titleMatch = block.match(/<title[^>]*><!\[CDATA\[(.*?)\]\]><\/title>/)
+          ?? block.match(/<title[^>]*>(.*?)<\/title>/)
+        const title = titleMatch?.[1]?.trim()
+        if (!title) continue
+
+        // Extract link
+        const linkMatch = block.match(/<link[^>]*href="([^"]+)"/)
+          ?? block.match(/<link>(.*?)<\/link>/)
+          ?? block.match(/<id>(https?:\/\/[^<]+)<\/id>/)
+        const link = linkMatch?.[1]?.trim()
+
+        // Extract author
+        const authorMatch = block.match(/<author[^>]*>[\s\S]*?<name>(.*?)<\/name>/)
+          ?? block.match(/<dc:creator><!\[CDATA\[(.*?)\]\]><\/dc:creator>/)
+          ?? block.match(/<dc:creator>(.*?)<\/dc:creator>/)
+        const author = authorMatch?.[1]?.trim() ?? `r/${sub}`
+
+        // Extract date
+        const dateMatch = block.match(/<published>(.*?)<\/published>/)
+          ?? block.match(/<updated>(.*?)<\/updated>/)
+          ?? block.match(/<pubDate>(.*?)<\/pubDate>/)
+        const dateStr = dateMatch?.[1]?.trim()
+        const created = dateStr
+          ? new Date(dateStr).toISOString()
+          : new Date().toISOString()
+
+        // Generate stable ID from link or title
+        const id = `reddit-${(link ?? title).replace(/[^a-z0-9]/gi, '').slice(0, 32)}`
+
+        posts.push({
+          id,
+          text: title
+            .replace(/&amp;/g, '&')
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .replace(/&quot;/g, '"')
+            .replace(/&#39;/g, "'"),
+          author: author.startsWith('/u/') ? author : `/u/${author}`,
+          created,
+          source: 'reddit',
+          url: link ?? `https://reddit.com/r/${sub}`,
+          subreddit: sub,
+        })
+      }
+    } catch {
+      // Silently skip failed feed
+    }
+  }))
+
   const seen = new Set<string>()
   return posts
     .filter(p => {
