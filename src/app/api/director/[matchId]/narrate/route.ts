@@ -8,37 +8,45 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ matchId: string }> }
 ) {
-  // Await params if needed, though not directly used in the logic below
-  // it ensures the route signature matches Next.js expectations
-  await params 
+  await params // Ensure Next.js 16 compatibility
 
   try {
-    const { script, genre } = await request.json() as {
-      script: string
-      genre: string
-    }
+    const body = await request.json()
+    const { script, genre } = body as { script: string; genre: string }
 
-    if (!script) {
+    if (!script?.trim()) {
       return NextResponse.json({ error: 'No script provided' }, { status: 400 })
     }
 
     const result = await textToSpeech(script, genre)
 
     if (!result.audioUrl) {
-      return NextResponse.json(
-        { error: result.error ?? 'TTS failed', usedFallback: true },
-        { status: 503 }
-      )
+      // Return 200 with error info — client handles it gracefully
+      return NextResponse.json({
+        audioUrl: null,
+        error: result.error ?? 'TTS generation failed',
+        rawResponse: result.rawResponse,
+        debug: {
+          genre,
+          scriptLength: script.length,
+          keysConfigured: !!(
+            process.env.UNREAL_SPEECH_API_KEY_1 ||
+            process.env.UNREAL_SPEECH_API_KEY_2 ||
+            process.env.UNREAL_SPEECH_API_KEY_3
+          ),
+        },
+      })
     }
 
     return NextResponse.json({
       audioUrl: result.audioUrl,
-      usedFallback: false,
+      error: null,
     })
 
   } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unknown error'
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Narration failed' },
+      { audioUrl: null, error: message },
       { status: 500 }
     )
   }

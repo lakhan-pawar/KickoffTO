@@ -17,25 +17,20 @@ function nextKey(): string | null {
 }
 
 // Genre → voice mapping
-// Will: confident male, good for heist/western
-// Dan: deep male, good for horror/documentary
-// Scarlett: clear female, good for sci-fi
-// Liv: warm female, good for romance
-// Amy: authoritative, good for documentary
-// Freya: light female, good for comedy
 export const GENRE_VOICES: Record<string, string> = {
-  horror:  'Dan',      // deep, menacing
-  romance: 'Liv',      // warm, emotional
-  heist:   'Will',     // sharp, confident
-  scifi:   'Scarlett', // clear, futuristic
-  western: 'Dan',      // gruff, measured
-  comedy:  'Freya',    // light, playful
+  horror:  'Dan',
+  romance: 'Liv',
+  heist:   'Will',
+  scifi:   'Scarlett',
+  western: 'Dan',
+  comedy:  'Freya',
 }
 
 export interface TTSResult {
   audioUrl: string | null
   error?: string
   usedFallback: boolean
+  rawResponse?: string
 }
 
 export async function textToSpeech(
@@ -43,19 +38,20 @@ export async function textToSpeech(
   genre: string = 'heist'
 ): Promise<TTSResult> {
   const voiceId = GENRE_VOICES[genre] ?? 'Will'
-  const truncated = text.slice(0, 3000) // max per request
+  const truncated = text.slice(0, 3000)
+
+  if (KEYS.length === 0) {
+    return {
+      audioUrl: null,
+      error: 'No UNREAL_SPEECH_API_KEY configured in Vercel environment variables.',
+      usedFallback: true,
+    }
+  }
 
   // Try each key in rotation
-  for (let attempt = 0; attempt < Math.max(KEYS.length, 1); attempt++) {
+  for (let attempt = 0; attempt < KEYS.length; attempt++) {
     const key = nextKey()
-
-    if (!key) {
-      return {
-        audioUrl: null,
-        error: 'No Unreal Speech API keys configured. Add UNREAL_SPEECH_API_KEY_1 to Vercel.',
-        usedFallback: true,
-      }
-    }
+    if (!key) continue
 
     try {
       const res = await fetch('https://api.v7.unrealspeech.com/speech', {
@@ -74,24 +70,63 @@ export async function textToSpeech(
         }),
       })
 
+      // Always read as text first — API sometimes returns plain text errors
+      const rawText = await res.text()
+
       // Rate limited — try next key
       if (res.status === 429) {
-        continue
+        if (attempt < KEYS.length - 1) continue
+        return {
+          audioUrl: null,
+          error: 'Rate limit hit on all configured keys.',
+          usedFallback: true,
+          rawResponse: rawText,
+        }
       }
 
-      if (!res.ok) {
-        const err = await res.text()
-        throw new Error(`Unreal Speech ${res.status}: ${err}`)
+      // Try to parse as JSON
+      let data: any = {}
+      try {
+        data = JSON.parse(rawText)
+      } catch {
+        // Not JSON — plain text error from Unreal Speech
+        return {
+          audioUrl: null,
+          error: `Unreal Speech error: ${rawText.slice(0, 200)}`,
+          usedFallback: true,
+          rawResponse: rawText,
+        }
       }
 
-      const data = await res.json() as {
-        OutputUri?: string
-        output_uri?: string
+      // Check for error in JSON response
+      if (data.error || data.message || !res.ok) {
+        const errMsg = (data.error ?? data.message ?? `HTTP ${res.status}`) as string
+        return {
+          audioUrl: null,
+          error: `Unreal Speech: ${errMsg}`,
+          usedFallback: true,
+          rawResponse: rawText,
+        }
       }
 
-      const audioUrl = data.OutputUri ?? data.output_uri ?? null
+      // Extract audio URL — try multiple field names
+      const audioUrl = (
+        data.OutputUri ??
+        data.output_uri ??
+        data.audioUri ??
+        data.audio_uri ??
+        data.url ??
+        null
+      ) as string | null
 
-      if (!audioUrl) throw new Error('No audio URL in response')
+      if (!audioUrl) {
+        return {
+          audioUrl: null,
+          error: `No audio URL in response. Fields: ${Object.keys(data).join(', ')}`,
+          usedFallback: true,
+          rawResponse: rawText,
+        }
+      }
 
       return { audioUrl, usedFallback: false }
 
@@ -99,7 +134,7 @@ export async function textToSpeech(
       if (attempt < KEYS.length - 1) continue
       return {
         audioUrl: null,
-        error: err instanceof Error ? err.message : 'TTS failed',
+        error: err instanceof Error ? err.message : 'Network error',
         usedFallback: true,
       }
     }

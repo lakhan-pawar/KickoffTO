@@ -90,15 +90,42 @@ export function DirectorModeClient({ match, initialGenre }: DirectorModeClientPr
         body: JSON.stringify({ script, genre: selectedGenre }),
       })
 
-      if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.error ?? `API error ${res.status}`)
+      // Always parse as text first to avoid JSON parse errors
+      const rawText = await res.text()
+      let data: { audioUrl?: string | null; error?: string; debug?: Record<string, unknown> } = {}
+
+      try {
+        data = JSON.parse(rawText)
+      } catch {
+        setAudioError(`Server error: ${rawText.slice(0, 150)}`)
+        return
       }
 
-      const data = await res.json()
-      setAudioUrl(data.audioUrl)
+      if (data.audioUrl) {
+        setAudioUrl(data.audioUrl)
+      } else {
+        // Show helpful error based on what went wrong
+        let errorMsg = data.error ?? 'Audio generation failed'
+
+        if (errorMsg.includes('No UNREAL_SPEECH_API_KEY')) {
+          errorMsg = '⚙️ Unreal Speech API key not configured. Add UNREAL_SPEECH_API_KEY_1 to Vercel.'
+        } else if (errorMsg.includes('401') || errorMsg.includes('Unauthorized')) {
+          errorMsg = '🔑 Invalid API key. Check UNREAL_SPEECH_API_KEY_1 in Vercel settings.'
+        } else if (errorMsg.includes('quota') || errorMsg.includes('limit')) {
+          errorMsg = '📊 Monthly quota reached. Add a second Unreal Speech account.'
+        } else if (errorMsg.includes('No audio URL')) {
+          errorMsg = `🔧 Unexpected API response format. Raw: ${data.error}`
+        }
+
+        setAudioError(errorMsg)
+
+        // Log debug info to console for developer visibility
+        if (data.debug) {
+          console.error('[Director TTS Debug]', data.debug)
+        }
+      }
     } catch (err: unknown) {
-      setAudioError(err instanceof Error ? err.message : 'Narration failed')
+      setAudioError(err instanceof Error ? err.message : 'Network error — check connection')
     } finally {
       setAudioLoading(false)
     }
@@ -350,13 +377,27 @@ export function DirectorModeClient({ match, initialGenre }: DirectorModeClientPr
 
             {audioError && (
               <div style={{
-                fontSize: 11, color: '#f87171', marginTop: 8,
+                fontSize: 12, color: '#f87171', marginTop: 8,
                 background: 'rgba(220,38,38,0.08)',
-                borderRadius: 8, padding: '8px 12px',
+                border: '1px solid rgba(220,38,38,0.2)',
+                borderRadius: 8, padding: '10px 12px',
+                lineHeight: 1.5,
               }}>
-                {audioError.includes('No Unreal Speech')
-                  ? '⚙️ Add UNREAL_SPEECH_API_KEY_1 to Vercel environment variables'
-                  : audioError}
+                <div style={{ fontWeight: 700, marginBottom: 4 }}>Audio generation failed</div>
+                <div style={{ fontSize: 11 }}>{audioError}</div>
+                {audioError.includes('Vercel') && (
+                  <a
+                    href="https://vercel.com/dashboard"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      display: 'inline-block', marginTop: 6,
+                      fontSize: 11, color: '#60a5fa',
+                    }}
+                  >
+                    Open Vercel Dashboard →
+                  </a>
+                )}
               </div>
             )}
 
