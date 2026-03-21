@@ -1,5 +1,5 @@
 // src/lib/unrealspeech.ts
-// Key rotation — 3 free accounts = 750k chars/month total
+// Uses v8 /stream endpoint — returns base64 audio data URI directly
 
 const KEYS = [
   process.env.UNREAL_SPEECH_API_KEY_1,
@@ -16,48 +16,54 @@ function nextKey(): string | null {
   return key
 }
 
-// Genre → voice mapping
-export const GENRE_VOICES: Record<string, string> = {
-  horror:  'Dan',
-  romance: 'Liv',
-  heist:   'Will',
-  scifi:   'Scarlett',
-  western: 'Dan',
-  comedy:  'Freya',
+// Genre-matched voices and settings
+export const GENRE_CONFIG: Record<string, {
+  voice: string
+  speed: string
+  pitch: string
+  label: string
+}> = {
+  horror:  { voice: 'Dan',      speed: '-0.3', pitch: '0.85', label: 'Dan — deep & eerie'      },
+  romance: { voice: 'Liv',      speed: '-0.1', pitch: '1.05', label: 'Liv — warm & emotional'  },
+  heist:   { voice: 'Will',     speed: '0.1',  pitch: '1.0',  label: 'Will — sharp & confident'},
+  scifi:   { voice: 'Scarlett', speed: '0.0',  pitch: '1.1',  label: 'Scarlett — clear & cool' },
+  western: { voice: 'Dan',      speed: '-0.2', pitch: '0.9',  label: 'Dan — gruff & measured'  },
+  comedy:  { voice: 'Freya',    speed: '0.2',  pitch: '1.1',  label: 'Freya — light & playful' },
 }
 
 export interface TTSResult {
-  audioUrl: string | null
+  audioDataUri: string | null  // data:audio/mpeg;base64,...
   error?: string
-  usedFallback: boolean
-  rawResponse?: string
+  voiceUsed?: string
 }
 
 export async function textToSpeech(
   text: string,
   genre: string = 'heist'
 ): Promise<TTSResult> {
-  const voiceId = GENRE_VOICES[genre] ?? 'Will'
-  const truncated = text.slice(0, 1500) // shorter = faster generation, less timeout risk
-
   if (KEYS.length === 0) {
     return {
-      audioUrl: null,
-      error: 'No UNREAL_SPEECH_API_KEY configured in Vercel environment variables.',
-      usedFallback: true,
+      audioDataUri: null,
+      error: 'No UNREAL_SPEECH_API_KEY configured. Add UNREAL_SPEECH_API_KEY_1 to Vercel.',
     }
   }
 
-  // Try each key in rotation
+  const config = GENRE_CONFIG[genre] ?? GENRE_CONFIG.heist
+
+  // /stream supports max 1000 chars
+  const truncated = text.slice(0, 1000)
+  const useStream = truncated.length <= 1000
+
   for (let attempt = 0; attempt < KEYS.length; attempt++) {
     const key = nextKey()
     if (!key) continue
 
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 25000) // 25s timeout
-
     try {
-      const res = await fetch('https://api.v7.unrealspeech.com/speech', {
+      const endpoint = useStream
+        ? 'https://api.v8.unrealspeech.com/stream'
+        : 'https://api.v8.unrealspeech.com/speech'
+
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${key}`,
@@ -65,87 +71,53 @@ export async function textToSpeech(
         },
         body: JSON.stringify({
           Text: truncated,
-          VoiceId: voiceId,
+          VoiceId: config.voice,
           Bitrate: '192k',
-          Speed: '0',
-          Pitch: '1',
-          TimestampType: 'sentence',
+          Speed: config.speed,
+          Pitch: config.pitch,
+          Codec: 'libmp3lame',
         }),
-        signal: controller.signal,
       })
 
-      clearTimeout(timeoutId)
-
-      // Always read as text first — API sometimes returns plain text errors
-      const rawText = await res.text()
-
       // Rate limited — try next key
-      if (res.status === 429) {
-        if (attempt < KEYS.length - 1) continue
-        return {
-          audioUrl: null,
-          error: 'Rate limit hit on all configured keys.',
-          usedFallback: true,
-          rawResponse: rawText,
+      if (res.status === 429) continue
+
+      if (!res.ok) {
+        const errText = await res.text()
+        let errMsg = `HTTP ${res.status}`
+        try {
+          const errJson = JSON.parse(errText)
+          errMsg = errJson.message ?? errJson.error ?? errMsg
+        } catch {
+          errMsg = errText.slice(0, 100) || errMsg
         }
+        throw new Error(errMsg)
       }
 
-      // Try to parse as JSON
-      let data: any = {}
-      try {
-        data = JSON.parse(rawText)
-      } catch {
-        // Not JSON — plain text error from Unreal Speech
-        return {
-          audioUrl: null,
-          error: `Unreal Speech error: ${rawText.slice(0, 200)}`,
-          usedFallback: true,
-          rawResponse: rawText,
-        }
+      // /stream returns raw audio bytes
+      const arrayBuffer = await res.arrayBuffer()
+
+      if (arrayBuffer.byteLength === 0) {
+        throw new Error('Empty audio response from Unreal Speech')
       }
 
-      // Check for error in JSON response
-      if (data.error || data.message || !res.ok) {
-        const errMsg = (data.error ?? data.message ?? `HTTP ${res.status}`) as string
-        return {
-          audioUrl: null,
-          error: `Unreal Speech: ${errMsg}`,
-          usedFallback: true,
-          rawResponse: rawText,
-        }
+      // Buffer works in Node.js runtime
+      const base64 = Buffer.from(arrayBuffer).toString('base64')
+      const dataUri = `data:audio/mpeg;base64,${base64}`
+
+      return {
+        audioDataUri: dataUri,
+        voiceUsed: config.label,
       }
-
-      // Extract audio URL — try multiple field names
-      const audioUrl = (
-        data.OutputUri ??
-        data.output_uri ??
-        data.audioUri ??
-        data.audio_uri ??
-        data.url ??
-        null
-      ) as string | null
-
-      if (!audioUrl) {
-        return {
-          audioUrl: null,
-          error: `No audio URL in response. Fields: ${Object.keys(data).join(', ')}`,
-          usedFallback: true,
-          rawResponse: rawText,
-        }
-      }
-
-      return { audioUrl, usedFallback: false }
 
     } catch (err: unknown) {
-      clearTimeout(timeoutId)
       if (attempt < KEYS.length - 1) continue
       return {
-        audioUrl: null,
-        error: err instanceof Error ? err.message : 'Network error',
-        usedFallback: true,
+        audioDataUri: null,
+        error: err instanceof Error ? err.message : 'TTS failed',
       }
     }
   }
 
-  return { audioUrl: null, error: 'All keys exhausted', usedFallback: true }
+  return { audioDataUri: null, error: 'All keys exhausted' }
 }

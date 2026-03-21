@@ -1,10 +1,9 @@
 // src/app/api/director/[matchId]/narrate/route.ts
-// NO edge runtime — needs Node.js for longer timeout (60s on Vercel)
+// Node.js runtime — NOT edge (needs Buffer for base64 conversion)
 import { NextRequest, NextResponse } from 'next/server'
 import { textToSpeech } from '@/lib/unrealspeech'
 
-// Do NOT add: export const runtime = 'edge'
-// Node.js runtime allows up to 60s on Vercel hobby plan
+// No edge runtime — Node.js allows Buffer and longer timeout (60s)
 
 export async function POST(
   request: NextRequest,
@@ -22,33 +21,22 @@ export async function POST(
 
     const result = await textToSpeech(script, genre)
 
-    if (!result.audioUrl) {
-      // Return 200 with error info — client handles it gracefully
+    if (!result.audioDataUri) {
       return NextResponse.json({
-        audioUrl: null,
-        error: result.error ?? 'TTS generation failed',
-        rawResponse: result.rawResponse,
-        debug: {
-          genre,
-          scriptLength: script.length,
-          keysConfigured: !!(
-            process.env.UNREAL_SPEECH_API_KEY_1 ||
-            process.env.UNREAL_SPEECH_API_KEY_2 ||
-            process.env.UNREAL_SPEECH_API_KEY_3
-          ),
-        },
+        audioDataUri: null,
+        error: result.error ?? 'Audio generation failed',
       })
     }
 
     return NextResponse.json({
-      audioUrl: result.audioUrl,
+      audioDataUri: result.audioDataUri,
+      voiceUsed: result.voiceUsed,
       error: null,
     })
 
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Unknown error'
     return NextResponse.json(
-      { audioUrl: null, error: message },
+      { audioDataUri: null, error: err instanceof Error ? err.message : 'Server error' },
       { status: 500 }
     )
   }

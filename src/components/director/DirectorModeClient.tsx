@@ -42,12 +42,13 @@ export function DirectorModeClient({ match, initialGenre }: DirectorModeClientPr
   const [script, setScript]               = useState('')
   const [loading, setLoading]             = useState(false)
   const [error, setError]                 = useState('')
-  const [audioUrl, setAudioUrl]           = useState<string | null>(null)
   const [audioLoading, setAudioLoading]   = useState(false)
   const [audioError, setAudioError]       = useState('')
   const [isPlaying, setIsPlaying]         = useState(false)
   const [cached, setCached]               = useState(false)
   const [audioStatus, setAudioStatus]     = useState('')
+  const [audioDataUri, setAudioDataUri]   = useState<string | null>(null)
+  const [voiceUsed, setVoiceUsed]         = useState('')
   const audioRef = useRef<HTMLAudioElement>(null)
 
   const genre = GENRES.find(g => g.id === selectedGenre)
@@ -57,8 +58,9 @@ export function DirectorModeClient({ match, initialGenre }: DirectorModeClientPr
     setLoading(true)
     setError('')
     setScript('')
-    setAudioUrl(null)
+    setAudioDataUri(null)
     setAudioError('')
+    setVoiceUsed('')
 
     try {
       const res = await fetch(`/api/director/${match.id}/generate`, {
@@ -82,13 +84,13 @@ export function DirectorModeClient({ match, initialGenre }: DirectorModeClientPr
     if (!script || !selectedGenre) return
     setAudioLoading(true)
     setAudioError('')
-    setAudioUrl(null)
-    setAudioStatus('Sending to Unreal Speech...')
+    setAudioDataUri(null)
+    setVoiceUsed('')
+    setAudioStatus('Connecting to Unreal Speech...')
 
-    // Show "still working" message after 10 seconds
     const slowTimer = setTimeout(() => {
-      setAudioStatus('Generating audio... this takes 15-20 seconds ⏳')
-    }, 10000)
+      setAudioStatus('Generating audio... usually takes 2-5 seconds')
+    }, 3000)
 
     try {
       const res = await fetch(`/api/director/${match.id}/narrate`, {
@@ -99,9 +101,13 @@ export function DirectorModeClient({ match, initialGenre }: DirectorModeClientPr
 
       clearTimeout(slowTimer)
 
-      // Always parse as text first to avoid JSON parse errors
+      // Always parse as text first
       const rawText = await res.text()
-      let data: { audioUrl?: string | null; error?: string; debug?: Record<string, unknown> } = {}
+      let data: {
+        audioDataUri?: string | null
+        voiceUsed?: string
+        error?: string
+      } = {}
 
       try {
         data = JSON.parse(rawText)
@@ -110,36 +116,27 @@ export function DirectorModeClient({ match, initialGenre }: DirectorModeClientPr
         return
       }
 
-      if (data.audioUrl) {
-        setAudioUrl(data.audioUrl)
+      if (data.audioDataUri) {
+        setAudioDataUri(data.audioDataUri)
+        setVoiceUsed(data.voiceUsed ?? '')
         setAudioStatus('')
       } else {
-        // Show helpful error based on what went wrong
         let errorMsg = data.error ?? 'Audio generation failed'
-
         if (errorMsg.includes('FUNCTION_INVOCATION_TIMEOUT')) {
-          errorMsg = '⏱️ Generation timed out. Try a shorter script or try again.'
+          errorMsg = '⏱️ Timed out. Script may be too long — try regenerating.'
         } else if (errorMsg.includes('No UNREAL_SPEECH_API_KEY')) {
-          errorMsg = '⚙️ Unreal Speech API key not configured. Add UNREAL_SPEECH_API_KEY_1 to Vercel.'
+          errorMsg = '⚙️ Add UNREAL_SPEECH_API_KEY_1 to Vercel environment variables.'
         } else if (errorMsg.includes('401') || errorMsg.includes('Unauthorized')) {
-          errorMsg = '🔑 Invalid API key. Check UNREAL_SPEECH_API_KEY_1 in Vercel settings.'
-        } else if (errorMsg.includes('quota') || errorMsg.includes('limit')) {
-          errorMsg = '📊 Monthly quota reached. Add a second Unreal Speech account.'
-        } else if (errorMsg.includes('No audio URL')) {
-          errorMsg = `🔧 Unexpected API response format. Raw: ${data.error}`
+          errorMsg = '🔑 Invalid API key. Regenerate at unrealspeech.com'
+        } else if (errorMsg.includes('429')) {
+          errorMsg = '📊 Rate limited. Try again in a moment.'
         }
-
         setAudioError(errorMsg)
         setAudioStatus('')
-
-        // Log debug info to console for developer visibility
-        if (data.debug) {
-          console.error('[Director TTS Debug]', data.debug)
-        }
       }
     } catch (err: unknown) {
       clearTimeout(slowTimer)
-      setAudioError(err instanceof Error ? err.message : 'Network error — check connection')
+      setAudioError(err instanceof Error ? err.message : 'Network error')
       setAudioStatus('')
     } finally {
       setAudioLoading(false)
@@ -360,7 +357,7 @@ export function DirectorModeClient({ match, initialGenre }: DirectorModeClientPr
           }}>
             <div style={{
               display: 'flex', alignItems: 'center',
-              gap: 10, marginBottom: audioUrl ? 12 : 0,
+              gap: 10, marginBottom: audioDataUri ? 12 : 0,
             }}>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginBottom: 2 }}>
@@ -426,12 +423,12 @@ export function DirectorModeClient({ match, initialGenre }: DirectorModeClientPr
               </div>
             )}
 
-            {/* Audio player */}
-            {audioUrl && (
+            {/* Audio Controls */}
+            {audioDataUri && (
               <div style={{ marginTop: 12 }}>
                 <audio
                   ref={audioRef}
-                  src={audioUrl}
+                  src={audioDataUri}
                   onPlay={() => setIsPlaying(true)}
                   onPause={() => setIsPlaying(false)}
                   onEnded={() => setIsPlaying(false)}
@@ -440,57 +437,55 @@ export function DirectorModeClient({ match, initialGenre }: DirectorModeClientPr
 
                 <div style={{
                   background: 'var(--bg-elevated)',
-                  border: `1px solid ${genre.color}33`,
+                  border: `1px solid ${genre?.color ?? 'var(--border)'}33`,
                   borderRadius: 12, padding: '12px 14px',
                   display: 'flex', alignItems: 'center', gap: 12,
                 }}>
-                  {/* Play/pause */}
                   <button
                     onClick={togglePlay}
                     style={{
                       width: 44, height: 44, borderRadius: '50%',
-                      background: `linear-gradient(135deg, ${genre.color}, ${genre.color}cc)`,
+                      background: `linear-gradient(135deg, ${genre?.color}, ${genre?.color}cc)`,
                       border: 'none', cursor: 'pointer', flexShrink: 0,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       fontSize: 18, color: '#fff',
-                      boxShadow: `0 2px 12px ${genre.color}55`,
+                      boxShadow: `0 2px 12px ${genre?.color}55`,
                     }}
                   >
                     {isPlaying ? '⏸' : '▶'}
                   </button>
 
                   <div style={{ flex: 1 }}>
-                    <div style={{
-                      fontSize: 12, fontWeight: 700, color: 'var(--text)', marginBottom: 2,
-                    }}>
-                      {genre.emoji} {genre.name} Narration
+                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginBottom: 2 }}>
+                      {genre?.emoji} {genre?.name} Narration
                     </div>
                     <div style={{ fontSize: 10, color: 'var(--text-3)' }}>
-                      {genre.voice} · Unreal Speech
+                      {voiceUsed || genre?.voice} · Unreal Speech v8
                       {isPlaying && (
-                        <span style={{ marginLeft: 8, color: genre.color }}>
+                        <span style={{ marginLeft: 8, color: genre?.color }}>
                           ● Playing...
                         </span>
                       )}
                     </div>
                   </div>
 
-                  {/* Download */}
-                  <a
-                    href={audioUrl}
-                    download={`kickoffto-director-${genre.id}.mp3`}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <button
+                    onClick={() => {
+                      const link = document.createElement('a')
+                      link.href = audioDataUri
+                      link.download = `kickoffto-${genre?.id}-narration.mp3`
+                      link.click()
+                    }}
                     style={{
                       background: 'var(--bg-card)',
                       border: '1px solid var(--border)',
                       borderRadius: 8, padding: '6px 10px',
                       fontSize: 11, color: 'var(--text-2)',
-                      textDecoration: 'none', flexShrink: 0,
+                      cursor: 'pointer', flexShrink: 0,
                     }}
                   >
                     ↓ MP3
-                  </a>
+                  </button>
                 </div>
               </div>
             )}
