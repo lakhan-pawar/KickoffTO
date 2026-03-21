@@ -1,5 +1,5 @@
 'use client'
-import { useParams } from 'next/navigation'
+import { useParams, useSearchParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { Navbar } from '@/components/ui/Navbar'
 import { BottomNav } from '@/components/ui/BottomNav'
@@ -9,6 +9,8 @@ import Link from 'next/link'
 
 export default function CharacterPage() {
   const params = useParams()
+  const searchParams = useSearchParams()
+  const prefilledQuestion = searchParams?.get('q') ?? ''
   const id = params?.id as string
   const character = CHARACTER_MAP.get(id)
   const [infoExpanded, setInfoExpanded] = useState(false)
@@ -212,7 +214,7 @@ export default function CharacterPage() {
         minHeight: 0,
         marginBottom: 56, // BottomNav height
       }}>
-        <ChatPanel character={character} compact />
+        <ChatPanel character={character} compact prefilledQuestion={prefilledQuestion} />
       </div>
 
       <BottomNav />

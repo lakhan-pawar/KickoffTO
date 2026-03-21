@@ -10,9 +10,10 @@ import type { Character } from '@/types'
 interface ChatPanelProps {
   character: Character
   compact?: boolean
+  prefilledQuestion?: string
 }
 
-export function ChatPanel({ character, compact }: ChatPanelProps) {
+export function ChatPanel({ character, compact, prefilledQuestion }: ChatPanelProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const [apiStatus, setApiStatus] = useState<'unknown' | 'ok' | 'error'>('unknown')
   const [apiError, setApiError] = useState('')
@@ -49,6 +50,12 @@ export function ChatPanel({ character, compact }: ChatPanelProps) {
   useEffect(() => {
     if (!isVoiceActive) stopSpeaking()
   }, [isVoiceActive])
+
+  useEffect(() => {
+    if (prefilledQuestion) {
+      setInput(prefilledQuestion)
+    }
+  }, [prefilledQuestion, setInput])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })

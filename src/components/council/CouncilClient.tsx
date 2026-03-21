@@ -1,151 +1,325 @@
 'use client'
 import { useState } from 'react'
-import { CHARACTERS } from '@/lib/constants'
-import { CharacterCard } from '@/components/ui/CharacterCard'
+import Link from 'next/link'
+
+const AGENTS = [
+  { id: 'el-maestro',    name: 'El Maestro',    icon: '🎯', color: '#1e3a5f', role: 'Tactics'    },
+  { id: 'xg-oracle',     name: 'xG Oracle',     icon: '📊', color: '#1a3a2a', role: 'Data'       },
+  { id: 'the-archive',   name: 'The Archive',   icon: '📜', color: '#1a3a1a', role: 'History'    },
+  { id: 'talentspotter', name: 'TalentSpotter', icon: '🔍', color: '#1a3a3a', role: 'Scouting'   },
+  { id: 'aria-9',        name: 'ARIA-9',        icon: '🤖', color: '#0a0a18', role: 'Machine'    },
+  { id: 'fpl-guru',      name: 'FPL Guru',      icon: '🏆', color: '#2a1a3a', role: 'Fantasy'    },
+  { id: 'the-voice',     name: 'The Voice',     icon: '🎙️', color: '#7c1d2e', role: 'Commentary' },
+  { id: 'the-antagonist',name: 'The Antagonist',icon: '⚡', color: '#2a0a0a', role: 'Dissent'    },
+]
+
+const FALLBACKS: Record<string, string> = {
+  'el-maestro':    "I'd need to study more tape before committing on that one.",
+  'xg-oracle':     "Insufficient data. Sample size too small for a meaningful conclusion.",
+  'the-archive':   "The historical record is ambiguous here. I'll reserve judgement.",
+  'talentspotter': "My scouts haven't filed a report on this yet.",
+  'aria-9':        "Query outside current parameters. No output generated.",
+  'fpl-guru':      "Still running the numbers. Fantasy implications are complex.",
+  'the-voice':     "And on this occasion... I'll let the silence speak.",
+  'the-antagonist':"Everyone else is wrong anyway, so does my opinion even matter?",
+}
+
+const SUGGESTED = [
+  "Who wins WC2026?",
+  "Best player at WC2026?",
+  "Which group is hardest?",
+  "Can Canada reach the knockouts?",
+  "Dark horses to watch?",
+  "Who surprises everyone?",
+]
+
+interface AgentResp {
+  id: string
+  text: string
+  loading: boolean
+}
 
 export function CouncilClient() {
-  const [question, setQuestion] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
-  const [responses, setResponses] = useState<Record<string, string>>({})
-  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [question, setQuestion]       = useState('')
+  const [asked, setAsked]             = useState('')
+  const [responses, setResponses]     = useState<AgentResp[]>([])
+  const [verdict, setVerdict]         = useState('')
+  const [verdictLoading, setVL]       = useState(false)
+  const [running, setRunning]         = useState(false)
 
-  async function askCouncil(e: React.FormEvent) {
-    e.preventDefault()
-    if (!question.trim() || isLoading) return
+  async function ask(q: string) {
+    if (!q.trim() || running) return
+    setRunning(true)
+    setAsked(q.trim())
+    setVerdict('')
+    setVL(false)
+    setResponses(AGENTS.map(a => ({ id: a.id, text: '', loading: true })))
 
-    setIsLoading(true)
-    setResponses({})
-    setErrors({})
-
-    // Parallel requests to all 16 characters
-    await Promise.all(CHARACTERS.map(async (char) => {
+    const promises = AGENTS.map(async agent => {
       try {
-        const res = await fetch(`/api/characters/${char.id}/chat`, {
+        const res = await fetch(`/api/characters/${agent.id}/chat`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            messages: [{ role: 'user', content: question }]
-          })
+            messages: [{
+              role: 'user',
+              content: `Council question: "${q}"\n\nReply in 2-3 sentences max. Stay in character. Be direct. No preamble.`,
+            }],
+          }),
+          signal: AbortSignal.timeout(14000),
         })
-
-        if (!res.ok) throw new Error('Failed to respond')
-        
-        // Handle streaming response simply for the council view
-        const reader = res.body?.getReader()
-        if (!reader) throw new Error('No reader')
-
-        let fullText = ''
-        const decoder = new TextDecoder()
-        
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-          
-          const chunk = decoder.decode(value)
-          // AI SDK Data Stream format: 0:"text"
-          const lines = chunk.split('\n').filter(Boolean)
-          for (const line of lines) {
-            if (line.startsWith('0:')) {
-              const text = JSON.parse(line.substring(2))
-              fullText += text
-              setResponses(prev => ({ ...prev, [char.id]: fullText }))
-            }
-          }
-        }
-      } catch (err: any) {
-        setErrors(prev => ({ ...prev, [char.id]: err.message }))
+        const data = await res.json()
+        const text = (data.response ?? data.content ?? data.message ?? '').trim()
+        setResponses(prev =>
+          prev.map(r => r.id === agent.id ? { ...r, text: text || FALLBACKS[agent.id], loading: false } : r)
+        )
+      } catch {
+        setResponses(prev =>
+          prev.map(r => r.id === agent.id ? { ...r, text: FALLBACKS[agent.id], loading: false } : r)
+        )
       }
-    }))
+    })
 
-    setIsLoading(false)
+    await Promise.allSettled(promises)
+    setRunning(false)
+
+    // Generate verdict
+    setVL(true)
+    try {
+      const res = await fetch('/api/characters/el-maestro/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [{
+            role: 'user',
+            content: `As council chair, give a 1-sentence verdict on: "${q}". Start directly — no preamble.`,
+          }],
+        }),
+        signal: AbortSignal.timeout(8000),
+      })
+      const data = await res.json()
+      setVerdict((data.response ?? data.content ?? '').trim())
+    } catch {
+      setVerdict("The council remains divided — no clear consensus on this one.")
+    } finally {
+      setVL(false)
+    }
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      {/* Input area */}
-      <form 
-        onSubmit={askCouncil}
-        style={{
-          background: 'var(--bg-card)', border: '1px solid var(--border)',
-          borderRadius: 16, padding: '20px 24px', position: 'relative',
-        }}
-      >
-        <textarea
-          value={question}
-          onChange={(e) => setQuestion(e.target.value)}
-          placeholder="Ask the council anything... 'Who will win WC2026?'"
-          style={{
-            width: '100%', background: 'transparent', border: 'none',
-            color: 'var(--text)', fontSize: 16, lineHeight: 1.5,
-            resize: 'none', height: 80, outline: 'none',
-          }}
-        />
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
-          <button
-            type="submit"
-            disabled={isLoading || !question.trim()}
+    <div>
+      {/* Input */}
+      <div style={{
+        background: 'var(--bg-card)', border: '1px solid var(--border)',
+        borderRadius: 16, padding: 16, marginBottom: 20,
+      }}>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+          <input
+            type="text"
+            value={question}
+            onChange={e => setQuestion(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') { ask(question); setQuestion('') }}}
+            placeholder="Ask the council anything about WC2026..."
+            disabled={running}
             style={{
-              background: 'var(--green)', color: '#fff', border: 'none',
-              borderRadius: 10, padding: '10px 24px', fontWeight: 700,
-              fontSize: 14, cursor: (isLoading || !question.trim()) ? 'not-allowed' : 'pointer',
-              opacity: (isLoading || !question.trim()) ? 0.6 : 1,
+              flex: 1, background: 'var(--bg-elevated)',
+              border: '1px solid var(--border)',
+              borderRadius: 12, padding: '12px 16px',
+              fontSize: 15, color: 'var(--text)', outline: 'none',
+              fontFamily: 'var(--font-body)', minHeight: 48,
+              opacity: running ? 0.6 : 1,
+            }}
+          />
+          <button
+            onClick={() => { ask(question); setQuestion('') }}
+            disabled={!question.trim() || running}
+            style={{
+              background: question.trim() && !running
+                ? 'linear-gradient(135deg,#16a34a,#15803d)' : 'var(--bg-elevated)',
+              color: question.trim() && !running ? '#fff' : 'var(--text-3)',
+              border: 'none', borderRadius: 12,
+              padding: '12px 20px', fontSize: 14, fontWeight: 700,
+              cursor: question.trim() && !running ? 'pointer' : 'not-allowed',
+              minHeight: 48, whiteSpace: 'nowrap', flexShrink: 0,
             }}
           >
-            {isLoading ? 'The Council is deliberating...' : 'Ask the Council →'}
+            {running ? 'Asking...' : 'Ask Council →'}
           </button>
         </div>
-      </form>
 
-      {/* Grid of responses */}
-      <div style={{
-        display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-        gap: 16,
-      }}>
-        {CHARACTERS.map(char => {
-          const response = responses[char.id]
-          const error = errors[char.id]
-          const isPending = isLoading && !response && !error
-
-          return (
-            <div key={char.id} style={{
-              background: 'var(--bg-card)', border: '1px solid var(--border)',
-              borderRadius: 12, overflow: 'hidden', display: 'flex', flexDirection: 'column',
-              opacity: isPending ? 0.6 : 1,
-              transition: 'opacity 0.3s ease',
-            }}>
-              <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)',
-                display: 'flex', alignItems: 'center', gap: 10, background: char.color + '11' }}>
-                <div style={{ width: 32, height: 32, borderRadius: 8, background: char.color,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontFamily: 'var(--font-display)', fontWeight: 800, color: '#fff', fontSize: 11 }}>
-                  {char.monogram}
-                </div>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{char.name}</div>
-                  <div style={{ fontSize: 10, color: 'var(--text-3)' }}>{char.tier} · {char.role}</div>
-                </div>
-              </div>
-              
-              <div style={{ padding: 14, flex: 1, minHeight: 80 }}>
-                {response ? (
-                  <p style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.6 }}>{response}</p>
-                ) : error ? (
-                  <p style={{ fontSize: 12, color: 'var(--red-card)' }}>⚠️ {error}</p>
-                ) : isPending ? (
-                  <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                    {[0, 1, 2].map(i => (
-                      <div key={i} style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--border-hover)',
-                        animation: 'typingBounce 1s infinite', animationDelay: `${i * 0.2}s` }} />
-                    ))}
-                  </div>
-                ) : (
-                  <p style={{ fontSize: 12, color: 'var(--text-3)', fontStyle: 'italic' }}>Waiting for question...</p>
-                )}
-              </div>
-            </div>
-          )
-        })}
+        {/* Suggested */}
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {SUGGESTED.map(s => (
+            <button key={s}
+              onClick={() => { ask(s) }}
+              disabled={running}
+              style={{
+                background: 'var(--bg-elevated)',
+                border: '1px solid var(--border)',
+                borderRadius: 99, padding: '5px 12px',
+                fontSize: 11, color: 'var(--text-2)',
+                cursor: running ? 'not-allowed' : 'pointer',
+                fontWeight: 500,
+              }}>
+              {s}
+            </button>
+          ))}
+        </div>
       </div>
+
+      {/* Empty state */}
+      {!asked && (
+        <div style={{
+          textAlign: 'center', padding: '48px 20px',
+          color: 'var(--text-3)',
+        }}>
+          <div style={{ fontSize: 48, marginBottom: 12 }}>⚡</div>
+          <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-2)', marginBottom: 6 }}>
+            8 characters. One question.
+          </div>
+          <div style={{ fontSize: 13 }}>
+            See how El Maestro, ARIA-9, The Antagonist and 5 others disagree.
+          </div>
+        </div>
+      )}
+
+      {asked && (
+        <>
+          {/* Active question */}
+          <div style={{
+            background: 'var(--green-tint)',
+            border: '1px solid rgba(22,163,74,0.2)',
+            borderRadius: 12, padding: '10px 16px',
+            fontSize: 14, fontWeight: 600, color: 'var(--text)',
+            marginBottom: 14,
+          }}>
+            &ldquo;{asked}&rdquo;
+          </div>
+
+          {/* Verdict */}
+          <div style={{
+            background: 'var(--bg-card)',
+            borderTop: '3px solid #16a34a',
+            border: '1px solid var(--border)',
+            borderRadius: '0 0 14px 14px',
+            padding: '12px 16px', marginBottom: 20,
+          }}>
+            <div style={{
+              fontSize: 9, fontWeight: 700, color: 'var(--green)',
+              textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6,
+            }}>
+              ⚡ Council Verdict
+            </div>
+            <p style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.55, margin: 0 }}>
+              {verdictLoading
+                ? 'Synthesising...'
+                : verdict || (running ? 'Awaiting all responses...' : '')}
+            </p>
+          </div>
+
+          {/* Note */}
+          <p style={{
+            fontSize: 11, color: 'var(--text-3)',
+            marginBottom: 14, fontStyle: 'italic',
+          }}>
+            Responses are intentionally brief. Tap &ldquo;Go deeper →&rdquo; on any card to continue with that character.
+          </p>
+
+          {/* Agent grid */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+            gap: 10,
+          }}>
+            {responses.map(r => {
+              const agent = AGENTS.find(a => a.id === r.id)!
+              return (
+                <div key={r.id} style={{
+                  background: 'var(--bg-card)',
+                  border: '1px solid var(--border)',
+                  borderLeft: `3px solid ${agent.color}`,
+                  borderRadius: '0 14px 14px 0',
+                  padding: 14,
+                }}>
+                  {/* Header */}
+                  <div style={{
+                    display: 'flex', alignItems: 'center',
+                    gap: 8, marginBottom: 10,
+                  }}>
+                    <div style={{
+                      width: 32, height: 32, borderRadius: 9,
+                      background: agent.color,
+                      display: 'flex', alignItems: 'center',
+                      justifyContent: 'center', fontSize: 16, flexShrink: 0,
+                    }}>
+                      {agent.icon}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{
+                        fontSize: 13, fontWeight: 700, color: 'var(--text)',
+                      }}>
+                        {agent.name}
+                      </div>
+                      <div style={{ fontSize: 9, color: 'var(--text-3)' }}>
+                        {agent.role}
+                      </div>
+                    </div>
+                    {r.loading && (
+                      <div style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
+                        {[0,1,2].map(i => (
+                          <span key={i} style={{
+                            width: 5, height: 5, borderRadius: '50%',
+                            background: agent.color, display: 'inline-block',
+                            animation: `typingBounce 0.6s ease-in-out ${i*0.12}s infinite`,
+                          }} />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Response */}
+                  {!r.loading && (
+                    <>
+                      <p style={{
+                        fontSize: 13, color: 'var(--text-2)',
+                        lineHeight: 1.65, margin: '0 0 12px',
+                      }}>
+                        {r.text}
+                      </p>
+
+                      {/* Go deeper — navigates to individual chat with question */}
+                      <Link
+                        href={`/characters/${r.id}?q=${encodeURIComponent(asked)}`}
+                        style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 6,
+                          background: 'var(--bg-elevated)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 8, padding: '6px 12px',
+                          fontSize: 11, color: 'var(--text-2)',
+                          textDecoration: 'none', fontWeight: 600,
+                          transition: 'border-color 0.15s, color 0.15s',
+                        }}
+                        onMouseEnter={e => {
+                          const el = e.currentTarget as HTMLAnchorElement
+                          el.style.borderColor = agent.color
+                          el.style.color = 'var(--text)'
+                        }}
+                        onMouseLeave={e => {
+                          const el = e.currentTarget as HTMLAnchorElement
+                          el.style.borderColor = 'var(--border)'
+                          el.style.color = 'var(--text-2)'
+                        }}
+                      >
+                        {agent.icon} Go deeper with {agent.name} →
+                      </Link>
+                    </>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </>
+      )}
     </div>
   )
 }
