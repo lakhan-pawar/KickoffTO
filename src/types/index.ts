@@ -11,6 +11,15 @@ export interface Match {
   venue: string
   kickoff: string // ISO date string
   intensity: 'normal' | 'big' | 'historic' // for emotion-tier animations
+  events?: MatchEvent[]
+}
+
+export interface MatchEvent {
+  minute: number
+  type: 'goal' | 'yellow' | 'red' | 'sub' | 'var'
+  team: 'home' | 'away'
+  player: string
+  detail?: string
 }
 
 export interface Team {

@@ -9,6 +9,8 @@ const MORE_LINKS = [
   { href: '/schedule',icon: '📅', label: 'Schedule', desc: 'All 104 WC2026 fixtures' },
   { href: '/teams',   icon: '🏳️', label: 'Teams', desc: 'All 48 qualified nations' },
   { href: '/groups',  icon: '⚽', label: 'Groups', desc: '12 groups · standings' },
+  { href: '/director/mock-arg-fra', icon: '🎬', label: 'Director Mode', desc: 'Match retold as Horror · Romance · Heist · Sci-Fi' },
+  { href: '/h2h', icon: '⚔️', label: 'Head to Head', desc: 'WC history between any two nations' },
 ]
 
 export default function MorePage() {

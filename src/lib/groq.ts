@@ -25,15 +25,20 @@ export async function groqChat(
   messages: { role: 'user' | 'assistant' | 'system'; content: string }[],
   model: string = MODEL_70B,
   maxTokens: number = 800,
+  systemPrompt?: string,
 ): Promise<string> {
   let lastError: Error | null = null
+
+  const fullMessages = systemPrompt
+    ? [{ role: 'system' as const, content: systemPrompt }, ...messages]
+    : messages
 
   for (let attempt = 0; attempt < GROQ_KEYS.length; attempt++) {
     try {
       const client = getGroqClient()
       const completion = await client.chat.completions.create({
         model,
-        messages,
+        messages: fullMessages,
         max_tokens: maxTokens,
         temperature: 0.8,
       })

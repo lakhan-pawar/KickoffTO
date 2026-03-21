@@ -8,6 +8,7 @@ import { LiveTabs } from './LiveTabs'
 import { MatchStats } from './MatchStats'
 import { RadioPanel } from './RadioPanel'
 import { MiniPlayer } from '@/components/ui/MiniPlayer'
+import { MatchDNA } from './MatchDNA'
 import type { Match, Goal } from '@/types'
 
 interface LiveMatchRoomProps {
@@ -43,6 +44,11 @@ export function LiveMatchRoom({ match }: LiveMatchRoomProps) {
 
         // Update momentum
         if (data.momentum !== undefined) setMomentum(data.momentum)
+        
+        // Update events
+        if (data.events) {
+          setLiveMatch(prev => ({ ...prev, events: data.events }))
+        }
       } catch {
         // Silent fail — keep polling
       }
@@ -73,6 +79,19 @@ export function LiveMatchRoom({ match }: LiveMatchRoomProps) {
           },
         },
       ])
+    }
+    
+    // Mock events
+    if (!liveMatch.events) {
+      setLiveMatch(prev => ({
+        ...prev,
+        events: [
+          { minute: 23, type: 'goal', team: 'home', player: 'L. Messi', detail: 'Left foot, 18 yards' },
+          { minute: 45, type: 'goal', team: 'away', player: 'K. Mbappé', detail: 'Counter-attack' },
+          { minute: 67, type: 'goal', team: 'home', player: 'L. Messi', detail: 'Penalty' },
+          { minute: 78, type: 'yellow', team: 'away', player: 'A. Tchouaméni', detail: 'Tactical foul' },
+        ]
+      }))
     }
   }, [])
 
@@ -123,7 +142,15 @@ export function LiveMatchRoom({ match }: LiveMatchRoomProps) {
 
         {/* Stats tab */}
         {activeTab === 'stats' && (
-          <MatchStats matchId={match.id} />
+          <>
+            <MatchDNA
+              events={liveMatch.events ?? []}
+              homeTeam={{ ...liveMatch.homeTeam, color: liveMatch.homeTeam.kitColors.home[0], flag: liveMatch.homeTeam.flag }}
+              awayTeam={{ ...liveMatch.awayTeam, color: liveMatch.awayTeam.kitColors.home[0], flag: liveMatch.awayTeam.flag }}
+              duration={liveMatch.minute ?? 90}
+            />
+            <MatchStats matchId={match.id} />
+          </>
         )}
 
         {/* Radio tab */}
