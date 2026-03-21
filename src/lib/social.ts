@@ -1,13 +1,14 @@
 // src/lib/social.ts
 import type { SocialPost } from '@/types'
 
-const REDDIT_UA = 'KickoffTo/1.0 (contact: hello@kickoffto.com)'
+const REDDIT_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
 
 // ── Reddit — PRIMARY source (always football-specific) ─────
 const FOOTBALL_SUBREDDITS = [
-  { sub: 'worldcup',  hot: true },
-  { sub: 'soccer',    hot: true },
-  { sub: 'football',  hot: true },
+  { sub: 'worldcup',      hot: true },
+  { sub: 'soccer',        hot: true },
+  { sub: 'football',      hot: true },
+  { sub: 'premierleague', hot: true },
 ]
 
 async function fetchRedditSub(
