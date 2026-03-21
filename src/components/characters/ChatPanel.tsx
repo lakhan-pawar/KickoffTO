@@ -11,19 +11,56 @@ interface ChatPanelProps {
 
 export function ChatPanel({ character }: ChatPanelProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const [apiStatus, setApiStatus] = useState<'unknown' | 'ok' | 'error'>('unknown')
+  const [apiError, setApiError] = useState('')
 
-  const { messages, input, handleInputChange, handleSubmit, isLoading, setInput } = useChat({
+  const {
+    messages,
+    input,
+    handleInputChange,
+    handleSubmit,
+    isLoading,
+    error,
+    setInput,
+    reload,
+  } = useChat({
     api: `/api/characters/${character.id}/chat`,
     initialMessages: [{
       id: 'welcome',
       role: 'assistant',
       content: character.welcome,
     }],
+    onError: (err) => {
+      console.error('Chat error:', err)
+      setApiError(err.message || 'Unknown error')
+      setApiStatus('error')
+    },
+    onFinish: () => {
+      setApiStatus('ok')
+      setApiError('')
+    },
   })
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  // Check API health on mount
+  useEffect(() => {
+    fetch('/api/debug/keys')
+      .then(r => r.json())
+      .then(data => {
+        if (data.groq) {
+          setApiStatus('ok')
+        } else {
+          setApiStatus('error')
+          setApiError('Groq API key not found in environment variables')
+        }
+      })
+      .catch(() => {
+        // Debug endpoint missing — not critical
+      })
+  }, [])
 
   return (
     <div style={{
@@ -33,6 +70,7 @@ export function ChatPanel({ character }: ChatPanelProps) {
       display: 'flex', flexDirection: 'column',
       height: 580, overflow: 'hidden',
     }}>
+
       {/* Header */}
       <div style={{
         padding: '12px 16px', borderBottom: '1px solid var(--border)',
@@ -53,19 +91,69 @@ export function ChatPanel({ character }: ChatPanelProps) {
           <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>
             {character.name}
           </div>
-          <div style={{ fontSize: 10, color: 'var(--green)', display: 'flex', alignItems: 'center', gap: 4 }}>
+          <div style={{
+            fontSize: 10,
+            display: 'flex', alignItems: 'center', gap: 4,
+            color: apiStatus === 'error' ? 'var(--red-card)'
+              : apiStatus === 'ok' ? 'var(--green)' : 'var(--text-3)',
+          }}>
             <span style={{
               width: 4, height: 4, borderRadius: '50%',
-              background: 'var(--green)', display: 'inline-block',
-              animation: 'livePulse 1.5s ease-in-out infinite',
+              background: apiStatus === 'error' ? 'var(--red-card)'
+                : apiStatus === 'ok' ? 'var(--green)' : 'var(--text-3)',
+              display: 'inline-block',
+              animation: apiStatus === 'ok'
+                ? 'livePulse 1.5s ease-in-out infinite' : 'none',
             }} />
-            Online
+            {apiStatus === 'error' ? 'Connection error'
+              : apiStatus === 'ok' ? 'Online'
+              : 'Connecting...'}
           </div>
         </div>
-        <div style={{ flexShrink: 0, minWidth: 140 }}>
+        <div style={{ flexShrink: 0, minWidth: 130 }}>
           <ShareButton characterId={character.id} />
         </div>
       </div>
+
+      {/* API Error Banner — shows when there's a connection problem */}
+      {(apiStatus === 'error' || error) && (
+        <div style={{
+          background: 'rgba(220,38,38,0.1)',
+          border: '1px solid rgba(220,38,38,0.3)',
+          borderRadius: 0,
+          padding: '10px 14px',
+          display: 'flex', alignItems: 'flex-start', gap: 10,
+        }}>
+          <span style={{ fontSize: 14, flexShrink: 0 }}>⚠️</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 12, fontWeight: 600,
+              color: 'var(--red-card)', marginBottom: 3 }}>
+              Chat connection issue
+            </div>
+            <div style={{
+              fontSize: 11, color: 'var(--red-card)', opacity: 0.8,
+              lineHeight: 1.5, wordBreak: 'break-word',
+            }}>
+              {apiError || error?.message || 'Could not connect to AI. Check API keys in Vercel environment variables.'}
+            </div>
+            <div style={{
+              fontSize: 10, color: 'var(--text-3)', marginTop: 4,
+            }}>
+              API: /api/characters/{character.id}/chat
+            </div>
+          </div>
+          <button
+            onClick={() => { setApiStatus('unknown'); setApiError(''); reload(); }}
+            style={{
+              background: 'var(--red-card)', color: '#fff', border: 'none',
+              borderRadius: 6, padding: '4px 8px', fontSize: 10,
+              cursor: 'pointer', flexShrink: 0, fontWeight: 600,
+            }}
+          >
+            Retry
+          </button>
+        </div>
+      )}
 
       {/* Messages */}
       <div style={{
@@ -89,7 +177,13 @@ export function ChatPanel({ character }: ChatPanelProps) {
                 borderBottomLeftRadius: 2,
               }),
             }}>
-              {message.content}
+              {message.content || (
+                // Empty response indicator
+                <span style={{ color: 'var(--text-3)', fontStyle: 'italic',
+                  fontSize: 12 }}>
+                  Empty response received — check Groq API key in Vercel env vars
+                </span>
+              )}
             </div>
           </div>
         ))}
@@ -98,8 +192,7 @@ export function ChatPanel({ character }: ChatPanelProps) {
         {isLoading && (
           <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
             <div style={{
-              padding: '10px 14px',
-              background: 'var(--bg-elevated)',
+              padding: '10px 14px', background: 'var(--bg-elevated)',
               border: '1px solid var(--border)',
               borderRadius: 10, borderBottomLeftRadius: 2,
               display: 'flex', gap: 4, alignItems: 'center',
@@ -116,8 +209,8 @@ export function ChatPanel({ character }: ChatPanelProps) {
           </div>
         )}
 
-        {/* Suggested prompts when only welcome message */}
-        {messages.length === 1 && (
+        {/* Suggested prompts on fresh chat */}
+        {messages.length === 1 && !isLoading && (
           <div style={{ marginTop: 8 }}>
             <p style={{
               fontSize: 10, fontWeight: 700, color: 'var(--text-3)',
@@ -127,10 +220,11 @@ export function ChatPanel({ character }: ChatPanelProps) {
             </p>
             <SuggestedPrompts
               prompts={character.suggested}
-              onSelect={(p) => setInput(p)}
+              onSelect={p => setInput(p)}
             />
           </div>
         )}
+
         <div ref={messagesEndRef} />
       </div>
 
@@ -169,15 +263,25 @@ export function ChatPanel({ character }: ChatPanelProps) {
             opacity: (isLoading || !input.trim()) ? 0.5 : 1,
           }}
         >
-          Send →
+          {isLoading ? '...' : 'Send →'}
         </button>
       </div>
 
+      {/* Footer with debug info */}
       <div style={{
         padding: '5px 12px', borderTop: '1px solid var(--border)',
         fontSize: 10, color: 'var(--text-3)', textAlign: 'center',
+        display: 'flex', justifyContent: 'space-between',
       }}>
-        Powered by Groq · responses may vary
+        <span>Powered by Groq · {character.model}</span>
+        <a
+          href="/api/debug/keys"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ color: 'var(--text-3)', textDecoration: 'none' }}
+        >
+          Check API status →
+        </a>
       </div>
     </div>
   )
