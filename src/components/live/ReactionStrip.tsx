@@ -28,6 +28,19 @@ export function ReactionStrip({ matchId, expanded = false }: ReactionStripProps)
     setAnimating(key)
     setTimeout(() => setAnimating(null), 300)
 
+    // Save to local journal for Wrapped/Journal features
+    try {
+      const journal = JSON.parse(localStorage.getItem('kt-journal') ?? '[]')
+      const newEntry = {
+        id: Date.now().toString(),
+        type: 'reaction',
+        matchId,
+        reaction: key,
+        timestamp: new Date().toISOString(),
+      }
+      localStorage.setItem('kt-journal', JSON.stringify([newEntry, ...journal].slice(0, 100)))
+    } catch (e) {}
+
     // Fire and forget to API
     try {
       await fetch(`/api/live/${matchId}/reactions`, {
