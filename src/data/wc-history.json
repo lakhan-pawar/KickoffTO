@@ -1,0 +1,232 @@
+[
+  {
+    "year": 1930,
+    "host": "Uruguay",
+    "winner": "Uruguay",
+    "winnerFlag": "🇺🇾",
+    "finalScore": "4-2",
+    "topScorer": "Guillermo Stábile (8)",
+    "teams": 13,
+    "narrative": "The dawn of a new era. In the shadow of the Centenario, Uruguay proved their Olympic dominance was no fluke, overcoming an aggressive Argentina to claim the first golden statuette."
+  },
+  {
+    "year": 1934,
+    "host": "Italy",
+    "winner": "Italy",
+    "winnerFlag": "🇮🇹",
+    "finalScore": "2-1 (aet)",
+    "topScorer": "Oldřich Nejedlý (5)",
+    "teams": 16,
+    "narrative": "A tournament played under a heavy political shadow, yet the football on the pitch was undeniably fierce. Vittorio Pozzo's Italy ground out a victory that began their decade of dominance."
+  },
+  {
+    "year": 1938,
+    "host": "France",
+    "winner": "Italy",
+    "winnerFlag": "🇮🇹",
+    "finalScore": "4-2",
+    "topScorer": "Leônidas (7)",
+    "teams": 15,
+    "narrative": "On the brink of global conflict, Italy retained their crown in Paris. They remain one of only two nations to win back-to-back titles, a testament to Pozzo's tactical rigour."
+  },
+  {
+    "year": 1950,
+    "host": "Brazil",
+    "winner": "Uruguay",
+    "winnerFlag": "🇺🇾",
+    "finalScore": "2-1",
+    "topScorer": "Ademir (8)",
+    "teams": 13,
+    "narrative": "The Maracanazo. A nation's heart broken by Ghiggia's low drive. Uruguay silenced 200,000 Brazilians, recording the greatest upset the game has ever seen."
+  },
+  {
+    "year": 1954,
+    "host": "Switzerland",
+    "winner": "West Germany",
+    "winnerFlag": "🇩🇪",
+    "finalScore": "3-2",
+    "topScorer": "Sándor Kocsis (11)",
+    "teams": 16,
+    "narrative": "The Miracle of Bern. Puskás and his 'Magical Magyars' seemed invincible, but the Germans found a spirit in the rain that would define their footballing identity for generations."
+  },
+  {
+    "year": 1958,
+    "host": "Sweden",
+    "winner": "Brazil",
+    "winnerFlag": "🇧🇷",
+    "finalScore": "5-2",
+    "topScorer": "Just Fontaine (13)",
+    "teams": 16,
+    "narrative": "The world met Pelé. A 17-year-old boy with the grace of a dancer and the clinical edge of a veteran led Brazil to their first title on European soil."
+  },
+  {
+    "year": 1962,
+    "host": "Chile",
+    "winner": "Brazil",
+    "winnerFlag": "🇧🇷",
+    "finalScore": "3-1",
+    "topScorer": "Garrincha (4)",
+    "teams": 16,
+    "narrative": "The tournament of Garrincha. With Pelé injured, the 'Angel with Bent Legs' took flight, bewildering defenders and ensuring the trophy returned to Rio."
+  },
+  {
+    "year": 1966,
+    "host": "England",
+    "winner": "England",
+    "winnerFlag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
+    "finalScore": "4-2 (aet)",
+    "topScorer": "Eusébio (9)",
+    "teams": 16,
+    "narrative": "They think it's all over! Bobby Moore's composure, Hurst's hat-trick, and a controversial line-call combined to give the home of football its greatest day."
+  },
+  {
+    "year": 1970,
+    "host": "Mexico",
+    "winner": "Brazil",
+    "winnerFlag": "🇧🇷",
+    "finalScore": "4-1",
+    "topScorer": "Gerd Müller (10)",
+    "teams": 16,
+    "narrative": "The Beautiful Game reached its zenith. In the heat of Mexico City, Pelé, Jairzinho, and Carlos Alberto played football like it was art, retiring the Jules Rimet trophy forever."
+  },
+  {
+    "year": 1974,
+    "host": "West Germany",
+    "winner": "West Germany",
+    "winnerFlag": "🇩🇪",
+    "finalScore": "2-1",
+    "topScorer": "Grzegorz Lato (7)",
+    "teams": 16,
+    "narrative": "Total Football vs. German Grit. Cruyff's brilliance met its match in Beckenbauer's leadership, as the hosts overcame a first-minute deficit to reclaim the crown."
+  },
+  {
+    "year": 1978,
+    "host": "Argentina",
+    "winner": "Argentina",
+    "winnerFlag": "🇦🇷",
+    "finalScore": "3-1 (aet)",
+    "topScorer": "Mario Kempes (6)",
+    "teams": 16,
+    "narrative": "A blizzard of ticker-tape in Buenos Aires. Mario Kempes was the hero in a final that shook the nation, bringing Argentina their first taste of global glory."
+  },
+  {
+    "year": 1982,
+    "host": "Spain",
+    "winner": "Italy",
+    "winnerFlag": "🇮🇹",
+    "finalScore": "3-1",
+    "topScorer": "Paolo Rossi (6)",
+    "teams": 24,
+    "narrative": "From controversy to triumph. Paolo Rossi emerged from the shadows to dismantle the best Brazil side never to win it, leading Italy to a third star."
+  },
+  {
+    "year": 1986,
+    "host": "Mexico",
+    "winner": "Argentina",
+    "winnerFlag": "🇦🇷",
+    "finalScore": "3-2",
+    "topScorer": "Gary Lineker (6)",
+    "teams": 24,
+    "narrative": "The Diego Maradona World Cup. From the 'Hand of God' to the 'Goal of the Century', one man carried the hopes of a nation on his shoulders to peak performance."
+  },
+  {
+    "year": 1990,
+    "host": "Italy",
+    "winner": "West Germany",
+    "winnerFlag": "🇩🇪",
+    "finalScore": "1-0",
+    "topScorer": "Salvatore Schillaci (6)",
+    "teams": 24,
+    "narrative": "A summer of tears and tactical caution. In the end, Mattheus and Brehme ensured a unified Germany celebrated their third title just before the wall came down."
+  },
+  {
+    "year": 1994,
+    "host": "USA",
+    "winner": "Brazil",
+    "winnerFlag": "🇧🇷",
+    "finalScore": "0-0 (3-2 pens)",
+    "topScorer": "Stoichkov & Salenko (6)",
+    "teams": 24,
+    "narrative": "Football came to the New World. A tournament of giant stadiums and scorching heat ended in the heartbreak of a missed penalty for the great Roberto Baggio."
+  },
+  {
+    "year": 1998,
+    "host": "France",
+    "winner": "France",
+    "winnerFlag": "🇫🇷",
+    "finalScore": "3-0",
+    "topScorer": "Davor Šuker (6)",
+    "teams": 32,
+    "narrative": "Unity in the Rainbow Nation. Zinedine Zidane's two headers at the Stade de France crowned a multi-cultural squad that united a country in celebration."
+  },
+  {
+    "year": 2002,
+    "host": "South Korea / Japan",
+    "winner": "Brazil",
+    "winnerFlag": "🇧🇷",
+    "finalScore": "2-0",
+    "topScorer": "Ronaldo (8)",
+    "teams": 32,
+    "narrative": "Redemption for Ronaldo. Four years after the mystery of Paris, the 'Phenomenon' conquered his demons and the world, leading Brazil to their fifth title."
+  },
+  {
+    "year": 2006,
+    "host": "Germany",
+    "winner": "Italy",
+    "winnerFlag": "🇮🇹",
+    "finalScore": "1-1 (5-3 pens)",
+    "topScorer": "Miroslav Klose (5)",
+    "teams": 32,
+    "narrative": "A summer fairytale ending in Berlin. A tournament remembered for Zidane's final act, but won by an Italian defence that was practically impenetrable."
+  },
+  {
+    "year": 2010,
+    "host": "South Africa",
+    "winner": "Spain",
+    "winnerFlag": "🇪🇸",
+    "finalScore": "1-0 (aet)",
+    "topScorer": "Multiple (5)",
+    "teams": 32,
+    "narrative": "The era of Tiki-Taka. To the sound of vuvuzelas, Andres Iniesta's late strike in Johannesburg finally gave Spain the global recognition their talent deserved."
+  },
+  {
+    "year": 2014,
+    "host": "Brazil",
+    "winner": "Germany",
+    "winnerFlag": "🇩🇪",
+    "finalScore": "1-0 (aet)",
+    "topScorer": "James Rodríguez (6)",
+    "teams": 32,
+    "narrative": "German efficiency meets Brazilian passion. Mario Gotze's chest-and-volley was the final flourish of a tournament where Germany humiliated the hosts 7-1."
+  },
+  {
+    "year": 2018,
+    "host": "Russia",
+    "winner": "France",
+    "winnerFlag": "🇫🇷",
+    "finalScore": "4-2",
+    "topScorer": "Harry Kane (6)",
+    "teams": 32,
+    "narrative": "The emergence of Mbappé. A youthful, powerful French side navigated a path of giants to secure their second star under the rain in Moscow."
+  },
+  {
+    "year": 2022,
+    "host": "Qatar",
+    "winner": "Argentina",
+    "winnerFlag": "🇦🇷",
+    "finalScore": "3-3 (4-2 pens)",
+    "topScorer": "Kylian Mbappé (8)",
+    "teams": 32,
+    "narrative": "The GOAT's crowning moment. In the greatest final ever played, Lionel Messi finally touched the sky, ending a 36-year wait for the Albiceleste."
+  },
+  {
+    "year": 2026,
+    "host": "Canada / Mexico / USA",
+    "winner": "TBD",
+    "winnerFlag": "🏳️",
+    "finalScore": "TBD",
+    "topScorer": "TBD",
+    "teams": 48,
+    "narrative": "A continent-sized celebration. Three nations, 48 dreams, and a new chapter waiting to be written in the annals of football history."
+  }
+]
