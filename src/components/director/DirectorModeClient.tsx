@@ -38,7 +38,7 @@ interface DirectorModeClientProps {
 }
 
 export function DirectorModeClient({ match, initialGenre }: DirectorModeClientProps) {
-  const [selectedGenre, setSelectedGenre] = useState<string | null>(null)
+  const [selectedGenre, setSelectedGenre] = useState<string | null>(initialGenre ?? null)
   const [script, setScript]               = useState('')
   const [loading, setLoading]             = useState(false)
   const [error, setError]                 = useState('')
