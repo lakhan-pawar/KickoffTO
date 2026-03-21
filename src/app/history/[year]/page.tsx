@@ -1,3 +1,4 @@
+// src/app/history/[year]/page.tsx v2
 import { notFound } from 'next/navigation'
 import { Navbar } from '@/components/ui/Navbar'
 import { BottomNav } from '@/components/ui/BottomNav'
@@ -5,14 +6,13 @@ import Link from 'next/link'
 import type { Metadata } from 'next'
 import wcHistory from '@/data/wc-history.json'
 
-const HISTORY_FLAG_ISO: Record<string,string> = {
-  'Uruguay':'uy', 'Italy':'it', 'Germany':'de', 'West Germany':'de',
-  'Brazil':'br', 'England':'gb-eng', 'Argentina':'ar',
-  'France':'fr', 'Spain':'es',
-}
-
 function getHistoryFlag(winnerName: string): string {
-  return HISTORY_FLAG_ISO[winnerName] ?? 'un'
+  const name = winnerName.toLowerCase().replace('west ', '').trim()
+  const map: Record<string,string> = {
+    uruguay:'uy', italy:'it', germany:'de', brazil:'br', england:'gb-eng',
+    argentina:'ar', france:'fr', spain:'es'
+  }
+  return map[name] ?? 'un'
 }
 
 interface PageProps {
