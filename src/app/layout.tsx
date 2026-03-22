@@ -29,10 +29,19 @@ export const metadata: Metadata = {
 
 import { MiniPlayer } from '@/components/ui/MiniPlayer'
 import { ToastProvider } from '@/components/ui/Toast'
+import Script from 'next/script'
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
+      <head>
+        <Script
+          async
+          src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${process.env.NEXT_PUBLIC_GA_ID}`}
+          crossOrigin="anonymous"
+          strategy="afterInteractive"
+        />
+      </head>
       <body className={`${bricolage.variable} ${dmSans.variable} font-body bg-page text-primary antialiased`}>
         <ToastProvider>
           {children}
