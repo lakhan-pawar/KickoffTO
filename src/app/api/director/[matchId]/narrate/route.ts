@@ -7,8 +7,9 @@ import { textToSpeech } from '@/lib/deepgram-tts'
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { matchId: string } }
+  { params }: { params: Promise<{ matchId: string }> }
 ) {
+  const { matchId } = await params
   try {
     const body = await request.json()
     const { script, genre } = body as { script: string; genre: string }
