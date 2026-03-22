@@ -58,16 +58,14 @@ export async function GET() {
       ),
     },
 
-    unrealSpeech: {
+    deepgramTTS: {
       configured: !!(
-        process.env.UNREAL_SPEECH_API_KEY_1 ||
-        process.env.UNREAL_SPEECH_API_KEY_2 ||
-        process.env.UNREAL_SPEECH_API_KEY_3
+        process.env.DEEPGRAM_API_KEY_1 ||
+        process.env.DEEPGRAM_API_KEY_2
       ),
       keys: [
-        { name: 'UNREAL_SPEECH_API_KEY_1', loaded: !!process.env.UNREAL_SPEECH_API_KEY_1 },
-        { name: 'UNREAL_SPEECH_API_KEY_2', loaded: !!process.env.UNREAL_SPEECH_API_KEY_2 },
-        { name: 'UNREAL_SPEECH_API_KEY_3', loaded: !!process.env.UNREAL_SPEECH_API_KEY_3 },
+        { name: 'DEEPGRAM_API_KEY_1', loaded: !!process.env.DEEPGRAM_API_KEY_1 },
+        { name: 'DEEPGRAM_API_KEY_2', loaded: !!process.env.DEEPGRAM_API_KEY_2 },
       ],
     },
 

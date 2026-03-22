@@ -2,14 +2,13 @@
 import { useState, useRef } from 'react'
 import { Flag, FLAG_ISO } from '@/components/ui/Flag'
 
-// Fixed emoji — no encoding issues
 const GENRES = [
-  { id: 'horror',  emoji: '🎃', name: 'Horror',      desc: 'A nightmare in 90 minutes',      voice: 'Jasper',   color: '#dc2626' },
-  { id: 'romance', emoji: '💕', name: 'Romance',     desc: 'Love in the beautiful game',     voice: 'Aria',     color: '#f43f5e' },
-  { id: 'heist',   emoji: '💰', name: 'Heist',       desc: 'The perfect footballing robbery', voice: 'Ryan',     color: '#d97706' },
-  { id: 'scifi',   emoji: '🚀', name: 'Sci-Fi',      desc: 'Football in the far future',     voice: 'Sierra',   color: '#2563eb' },
-  { id: 'western', emoji: '🤠', name: 'Western',     desc: 'A duel at high noon',            voice: 'Liam',     color: '#b45309' },
-  { id: 'comedy',  emoji: '😂', name: 'Comedy',      desc: 'When football gets absurd',      voice: 'Nova',     color: '#16a34a' },
+  { id: 'horror',  emoji: '🎃', name: 'Horror',  desc: 'A nightmare in 90 minutes',       voice: 'Orpheus',  color: '#dc2626' },
+  { id: 'romance', emoji: '💕', name: 'Romance', desc: 'Love in the beautiful game',      voice: 'Luna',     color: '#f43f5e' },
+  { id: 'heist',   emoji: '💰', name: 'Heist',   desc: 'The perfect footballing robbery', voice: 'Orion',    color: '#d97706' },
+  { id: 'scifi',   emoji: '🚀', name: 'Sci-Fi',  desc: 'Football in the far future',      voice: 'Stella',   color: '#2563eb' },
+  { id: 'western', emoji: '🤠', name: 'Western', desc: 'A duel at high noon',             voice: 'Arcas',    color: '#b45309' },
+  { id: 'comedy',  emoji: '😂', name: 'Comedy',  desc: 'When football gets absurd',       voice: 'Athena',   color: '#16a34a' },
 ]
 
 interface MatchEvent {
@@ -57,7 +56,7 @@ export function DirectorModeClient({ match, initialGenre }: DirectorModeClientPr
 
   const genre = GENRES.find(g => g.id === selectedGenre)
 
-  async function generate(genreId: string) {
+  async function generateAndNarrate(genreId: string) {
     setSelectedGenre(genreId)
     setLoading(true)
     setError('')
@@ -66,93 +65,80 @@ export function DirectorModeClient({ match, initialGenre }: DirectorModeClientPr
     setAudioError('')
     setVoiceUsed('')
     setNarrationInfo(null)
+    setAudioStatus('Writing screenplay...')
 
     try {
-      const res = await fetch(`/api/director/${match.id}/generate`, {
+      // Step 1: Generate screenplay via Groq
+      const scriptRes = await fetch(`/api/director/${match.id}/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ genre: genreId, match }),
       })
 
-      if (!res.ok) throw new Error(`API error ${res.status}`)
-      const data = await res.json()
-      setScript(data.script ?? '')
-      setCached(data.cached ?? false)
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Generation failed')
-    } finally {
+      if (!scriptRes.ok) throw new Error(`Script generation failed: ${scriptRes.status}`)
+
+      const scriptData = await scriptRes.json()
+      const generatedScript = scriptData.script ?? ''
+      setScript(generatedScript)
+      setCached(scriptData.cached ?? false)
+      
+      // Pivot to narration state
       setLoading(false)
-    }
-  }
+      setAudioLoading(true)
+      setAudioStatus('Narrating with Deepgram Aura-2...')
 
-  async function narrate() {
-    if (!script || !selectedGenre) return
-    setAudioLoading(true)
-    setAudioError('')
-    setAudioDataUri(null)
-    setVoiceUsed('')
-    setAudioStatus('Connecting to Unreal Speech...')
-
-    const slowTimer = setTimeout(() => {
-      setAudioStatus('Generating audio... usually takes 2-5 seconds')
-    }, 3000)
-
-    try {
-      const res = await fetch(`/api/director/${match.id}/narrate`, {
+      // Step 2: Generate audio immediately
+      const audioRes = await fetch(`/api/director/${match.id}/narrate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ script, genre: selectedGenre }),
+        body: JSON.stringify({ script: generatedScript, genre: genreId }),
       })
 
-      clearTimeout(slowTimer)
-
-      // Always parse as text first
-      const rawText = await res.text()
-      let data: {
+      const rawAudio = await audioRes.text()
+      let audioData: {
         audioDataUri?: string | null
         voiceUsed?: string
         originalLength?: number
         usedLength?: number
         error?: string
+        debug?: Record<string, unknown>
       } = {}
 
       try {
-        data = JSON.parse(rawText)
+        audioData = JSON.parse(rawAudio)
       } catch {
-        setAudioError(`Server error: ${rawText.slice(0, 150)}`)
+        setAudioError(`Server error: ${rawAudio.slice(0, 100)}`)
         return
       }
 
-      if (data.audioDataUri) {
-        setAudioDataUri(data.audioDataUri)
-        setVoiceUsed(data.voiceUsed ?? '')
-        setAudioStatus('')
-        if (data.originalLength && data.usedLength) {
+      if (audioData.audioDataUri) {
+        setAudioDataUri(audioData.audioDataUri)
+        setVoiceUsed(audioData.voiceUsed ?? '')
+        if (audioData.originalLength && audioData.usedLength) {
           setNarrationInfo({
-            originalLength: data.originalLength,
-            usedLength: data.usedLength,
+            originalLength: audioData.originalLength,
+            usedLength: audioData.usedLength,
           })
         }
       } else {
-        let errorMsg = data.error ?? 'Audio generation failed'
-        if (errorMsg.includes('FUNCTION_INVOCATION_TIMEOUT')) {
-          errorMsg = '⏱️ Timed out. Script may be too long — try regenerating.'
-        } else if (errorMsg.includes('No UNREAL_SPEECH_API_KEY')) {
-          errorMsg = '⚙️ Add UNREAL_SPEECH_API_KEY_1 to Vercel environment variables.'
-        } else if (errorMsg.includes('401') || errorMsg.includes('Unauthorized')) {
-          errorMsg = '🔑 Invalid API key. Regenerate at unrealspeech.com'
-        } else if (errorMsg.includes('429')) {
-          errorMsg = '📊 Rate limited. Try again in a moment.'
+        let errMsg = audioData.error ?? 'Audio generation failed'
+        if (errMsg.includes('No DEEPGRAM_API_KEY')) {
+          errMsg = '⚙️ Add DEEPGRAM_API_KEY_1 to Vercel environment variables'
+        } else if (errMsg.includes('Invalid Deepgram')) {
+          errMsg = '🔑 Invalid API key. Check console.deepgram.com'
+        } else if (errMsg.includes('quota') || errMsg.includes('exhausted')) {
+          errMsg = '📊 Quota reached. Add DEEPGRAM_API_KEY_2 to Vercel.'
         }
-        setAudioError(errorMsg)
-        setAudioStatus('')
+        setAudioError(errMsg)
+        if (audioData.debug) console.error('[Deepgram TTS Debug]', audioData.debug)
       }
+
     } catch (err: unknown) {
-      clearTimeout(slowTimer)
-      setAudioError(err instanceof Error ? err.message : 'Network error')
-      setAudioStatus('')
+      setError(err instanceof Error ? err.message : 'Generation failed')
     } finally {
+      setLoading(false)
       setAudioLoading(false)
+      setAudioStatus('')
     }
   }
 
@@ -216,7 +202,7 @@ export function DirectorModeClient({ match, initialGenre }: DirectorModeClientPr
         textTransform: 'uppercase', letterSpacing: '0.08em',
         marginBottom: 12,
       }}>
-        Choose a genre
+        Choose a genre to generate & narrate
       </p>
       <div style={{
         display: 'grid',
@@ -226,20 +212,20 @@ export function DirectorModeClient({ match, initialGenre }: DirectorModeClientPr
         {GENRES.map(g => (
           <button
             key={g.id}
-            onClick={() => generate(g.id)}
-            disabled={loading}
+            onClick={() => generateAndNarrate(g.id)}
+            disabled={loading || audioLoading}
             style={{
               background: selectedGenre === g.id
                 ? g.color + '22' : 'var(--bg-card)',
               border: `1px solid ${selectedGenre === g.id ? g.color : 'var(--border)'}`,
               borderRadius: 12, padding: '12px 14px',
-              cursor: loading ? 'not-allowed' : 'pointer',
+              cursor: (loading || audioLoading) ? 'not-allowed' : 'pointer',
               textAlign: 'left',
               transition: 'all 0.15s',
-              opacity: loading && selectedGenre !== g.id ? 0.5 : 1,
+              opacity: (loading || audioLoading) && selectedGenre !== g.id ? 0.5 : 1,
             }}
             onMouseEnter={e => {
-              if (!loading) {
+              if (!loading && !audioLoading) {
                 const el = e.currentTarget as HTMLButtonElement
                 el.style.borderColor = g.color
                 el.style.transform = 'translateY(-2px)'
@@ -264,14 +250,14 @@ export function DirectorModeClient({ match, initialGenre }: DirectorModeClientPr
               fontSize: 9, color: 'var(--text-3)', marginTop: 4,
               fontStyle: 'italic',
             }}>
-              Voice: {g.voice}
+              Voice: {g.voice} (Aura-2)
             </div>
           </button>
         ))}
       </div>
 
-      {/* Loading */}
-      {loading && (
+      {/* Global Loading State */}
+      {(loading || audioLoading) && (
         <div style={{
           background: 'var(--bg-card)', border: '1px solid var(--border)',
           borderRadius: 14, padding: '24px 20px', textAlign: 'center',
@@ -290,8 +276,11 @@ export function DirectorModeClient({ match, initialGenre }: DirectorModeClientPr
               }} />
             ))}
           </div>
-          <div style={{ fontSize: 13, color: 'var(--text-2)' }}>
-            {genre?.emoji} Writing {genre?.name} screenplay...
+          <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 4 }}>
+            {audioStatus || (loading ? `${genre?.emoji} Writing screenplay...` : 'Generating audio...')}
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text-3)' }}>
+            {loading ? 'Groq is writing your script' : 'Deepgram Aura-2 is narrating'}
           </div>
         </div>
       )}
@@ -308,7 +297,7 @@ export function DirectorModeClient({ match, initialGenre }: DirectorModeClientPr
         </div>
       )}
 
-      {/* Generated screenplay */}
+      {/* Generated screenplay + Audio Player */}
       {script && genre && (
         <div style={{ marginBottom: 20 }}>
 
@@ -322,7 +311,6 @@ export function DirectorModeClient({ match, initialGenre }: DirectorModeClientPr
             marginBottom: 14,
             position: 'relative',
           }}>
-            {/* Genre badge */}
             <div style={{
               display: 'flex', alignItems: 'center', gap: 8,
               marginBottom: 16,
@@ -340,14 +328,16 @@ export function DirectorModeClient({ match, initialGenre }: DirectorModeClientPr
                 </div>
               </div>
               <button
-                onClick={() => generate(genre.id)}
+                onClick={() => generateAndNarrate(genre.id)}
+                disabled={loading || audioLoading}
                 style={{
                   marginLeft: 'auto',
                   background: 'var(--bg-elevated)',
                   border: '1px solid var(--border)',
                   borderRadius: 8, padding: '5px 10px',
                   fontSize: 11, color: 'var(--text-2)',
-                  cursor: 'pointer',
+                  cursor: (loading || audioLoading) ? 'not-allowed' : 'pointer',
+                  opacity: (loading || audioLoading) ? 0.5 : 1,
                 }}
               >
                 🔄 Regenerate
@@ -363,65 +353,14 @@ export function DirectorModeClient({ match, initialGenre }: DirectorModeClientPr
             </div>
           </div>
 
-          {/* TTS controls */}
+          {/* Audio Player and Errors */}
           <div style={{
             background: 'var(--bg-card)', border: '1px solid var(--border)',
             borderRadius: 14, padding: '14px 16px',
           }}>
-            <div style={{
-              display: 'flex', alignItems: 'center',
-              gap: 10, marginBottom: audioDataUri ? 12 : 0,
-            }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginBottom: 2 }}>
-                  🎙️ Narrate this screenplay
-                </div>
-                <div style={{ fontSize: 10, color: 'var(--text-3)' }}>
-                  {genre.voice} voice · Powered by Unreal Speech
-                </div>
-              </div>
-
-              <button
-                onClick={narrate}
-                disabled={audioLoading}
-                style={{
-                  background: audioLoading
-                    ? 'var(--bg-elevated)'
-                    : `linear-gradient(135deg, ${genre.color}, ${genre.color}cc)`,
-                  color: audioLoading ? 'var(--text-3)' : '#fff',
-                  border: 'none', borderRadius: 10,
-                  padding: '10px 18px', fontSize: 13,
-                  fontWeight: 700, cursor: audioLoading ? 'not-allowed' : 'pointer',
-                  whiteSpace: 'nowrap',
-                  boxShadow: audioLoading ? 'none' : `0 4px 16px ${genre.color}44`,
-                }}
-              >
-                {audioLoading ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{
-                      width: 14, height: 14, border: '2px solid rgba(255,255,255,0.3)',
-                      borderTop: '2px solid #fff', borderRadius: '50%',
-                      animation: 'spin 0.8s linear infinite',
-                      display: 'inline-block', flexShrink: 0,
-                    }} />
-                    {audioStatus || 'Generating audio...'}
-                  </div>
-                ) : '▶ Generate audio'}
-              </button>
-            </div>
-
-            {script && script.length > 950 && !audioDataUri && !audioLoading && (
-              <p style={{
-                fontSize: 10, color: 'var(--text-3)',
-                marginTop: 6, fontStyle: 'italic',
-              }}>
-                ℹ️ First paragraph will be narrated (~950 chars max per request)
-              </p>
-            )}
-
             {audioError && (
               <div style={{
-                fontSize: 12, color: '#f87171', marginTop: 8,
+                fontSize: 12, color: '#f87171',
                 background: 'rgba(220,38,38,0.08)',
                 border: '1px solid rgba(220,38,38,0.2)',
                 borderRadius: 8, padding: '10px 12px',
@@ -429,25 +368,21 @@ export function DirectorModeClient({ match, initialGenre }: DirectorModeClientPr
               }}>
                 <div style={{ fontWeight: 700, marginBottom: 4 }}>Audio generation failed</div>
                 <div style={{ fontSize: 11 }}>{audioError}</div>
-                {audioError.includes('Vercel') && (
-                  <a
-                    href="https://vercel.com/dashboard"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{
-                      display: 'inline-block', marginTop: 6,
-                      fontSize: 11, color: '#60a5fa',
-                    }}
-                  >
-                    Open Vercel Dashboard →
-                  </a>
-                )}
+                <button 
+                  onClick={() => generateAndNarrate(genre.id)}
+                  style={{
+                    marginTop: 8, fontSize: 11, color: 'var(--text-2)',
+                    background: 'var(--bg-elevated)', border: '1px solid var(--border)',
+                    borderRadius: 6, padding: '4px 8px', cursor: 'pointer'
+                  }}
+                >
+                  Retry Narration
+                </button>
               </div>
             )}
 
-            {/* Audio Controls */}
             {audioDataUri && (
-              <div style={{ marginTop: 12 }}>
+              <div style={{ marginTop: audioError ? 12 : 0 }}>
                 <audio
                   ref={audioRef}
                   src={audioDataUri}
@@ -482,7 +417,7 @@ export function DirectorModeClient({ match, initialGenre }: DirectorModeClientPr
                       {genre?.emoji} {genre?.name} Narration
                     </div>
                     <div style={{ fontSize: 10, color: 'var(--text-3)' }}>
-                      {voiceUsed || genre?.voice} · Unreal Speech v8
+                      {voiceUsed || `${genre?.voice} (Aura-2)`}
                       {isPlaying && (
                         <span style={{ marginLeft: 8, color: genre?.color }}>
                           ● Playing...
@@ -519,22 +454,27 @@ export function DirectorModeClient({ match, initialGenre }: DirectorModeClientPr
                 )}
               </div>
             )}
+            
+            {!audioDataUri && !audioLoading && !audioError && (
+               <div style={{ fontSize: 11, color: 'var(--text-3)', textAlign: 'center' }}>
+                 Audio narrated by Deepgram Aura-2
+               </div>
+            )}
           </div>
 
-          {/* Attribution required by Unreal Speech free plan */}
           <p style={{
             fontSize: 9, color: 'var(--text-3)',
             textAlign: 'center', marginTop: 8,
           }}>
-            Audio by <a href="https://unrealspeech.com" target="_blank"
+            Audio by <a href="https://deepgram.com" target="_blank"
               rel="noopener noreferrer"
-              style={{ color: 'var(--text-3)' }}>unrealspeech.com</a>
+              style={{ color: 'var(--text-3)' }}>deepgram.com</a>
           </p>
         </div>
       )}
 
-      {/* Match events */}
-      {!script && !loading && match.events?.length > 0 && (
+      {/* Match events summary if no script yet */}
+      {!script && !loading && !audioLoading && match.events?.length > 0 && (
         <div style={{
           background: 'var(--bg-card)', border: '1px solid var(--border)',
           borderRadius: 12, padding: 16,
@@ -543,7 +483,7 @@ export function DirectorModeClient({ match, initialGenre }: DirectorModeClientPr
             fontSize: 10, fontWeight: 700, color: 'var(--text-3)',
             textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12,
           }}>
-            Match events · the raw material
+            Match events · ready for production
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {match.events.map((event, i) => (
@@ -575,7 +515,7 @@ export function DirectorModeClient({ match, initialGenre }: DirectorModeClientPr
             fontSize: 11, color: 'var(--text-3)',
             marginTop: 14, fontStyle: 'italic',
           }}>
-            Pick a genre above — Groq turns these events into a screenplay
+            Select a genre above to generate the screenplay and narration instantly.
           </p>
         </div>
       )}

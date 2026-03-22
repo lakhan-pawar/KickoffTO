@@ -1,16 +1,14 @@
 // src/app/api/director/[matchId]/narrate/route.ts
-// Node.js runtime — NOT edge (needs Buffer for base64 conversion)
+// Node.js runtime — NOT edge (needs Buffer for base64, longer timeout)
 import { NextRequest, NextResponse } from 'next/server'
-import { textToSpeech } from '@/lib/unrealspeech'
+import { textToSpeech } from '@/lib/deepgram-tts'
 
-// No edge runtime — Node.js allows Buffer and longer timeout (60s)
+// No edge runtime — Node.js allows 60s timeout on Vercel hobby
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ matchId: string }> }
+  { params }: { params: { matchId: string } }
 ) {
-  await params // Ensure Next.js 16 compatibility
-
   try {
     const body = await request.json()
     const { script, genre } = body as { script: string; genre: string }
@@ -25,15 +23,23 @@ export async function POST(
       return NextResponse.json({
         audioDataUri: null,
         error: result.error ?? 'Audio generation failed',
+        debug: {
+          genre,
+          scriptLength: script.length,
+          keysConfigured: !!(
+            process.env.DEEPGRAM_API_KEY_1 ||
+            process.env.DEEPGRAM_API_KEY_2
+          ),
+        },
       })
     }
 
     return NextResponse.json({
-      audioDataUri: result.audioDataUri,
-      voiceUsed: result.voiceUsed,
+      audioDataUri:   result.audioDataUri,
+      voiceUsed:      result.voiceUsed,
       originalLength: result.originalLength,
-      usedLength: result.usedLength,
-      error: null,
+      usedLength:     result.usedLength,
+      error:          null,
     })
 
   } catch (err: unknown) {
