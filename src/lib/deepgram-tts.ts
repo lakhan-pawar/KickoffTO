@@ -1,9 +1,5 @@
 // src/lib/deepgram-tts.ts
-// Deepgram Aura-2 TTS — 2-key rotation
-// Endpoint: POST https://api.deepgram.com/v1/speak?model=aura-2-[voice]-en
-// Auth: Authorization: Token YOUR_KEY
-// Body: plain text (Content-Type: text/plain)
-// Response: raw MP3 bytes
+// Multi-voice support — calls Deepgram per speaker segment.
 
 const KEYS = [
   process.env.DEEPGRAM_API_KEY_1,
@@ -13,147 +9,201 @@ const KEYS = [
 let keyIndex = 0
 
 function nextKey(): string | null {
-  if (KEYS.length === 0) return null
+  if (!KEYS.length) return null
   const key = KEYS[keyIndex % KEYS.length]
   keyIndex++
   return key
 }
 
-// Aura-2 genre-matched voices
-// Full list: asteria, luna, stella, athena, hera, orion, arcas, perseus,
-//            angus, orpheus, helios, zeus, thalia, amalthea, hermes, helena
+// Genre narrator voices
 export const GENRE_CONFIG: Record<string, {
-  voice: string
+  narratorVoice: string
   label: string
-  description: string
 }> = {
-  horror:  { voice: 'orpheus',  label: 'Orpheus',  description: 'Deep, haunting male voice'    },
-  romance: { voice: 'luna',     label: 'Luna',     description: 'Warm, emotional female voice' },
-  heist:   { voice: 'orion',    label: 'Orion',    description: 'Sharp, confident male voice'  },
-  scifi:   { voice: 'stella',   label: 'Stella',   description: 'Clear, futuristic female voice'},
-  western: { voice: 'arcas',    label: 'Arcas',    description: 'Gruff, measured male voice'   },
-  comedy:  { voice: 'athena',   label: 'Athena',   description: 'Bright, playful female voice' },
+  horror:  { narratorVoice: 'orpheus', label: 'Orpheus (Horror narrator)'   },
+  romance: { narratorVoice: 'luna',    label: 'Luna (Romance narrator)'     },
+  heist:   { narratorVoice: 'orion',   label: 'Orion (Heist narrator)'      },
+  scifi:   { narratorVoice: 'helios',  label: 'Helios (Sci-Fi narrator)'    },
+  western: { narratorVoice: 'arcas',   label: 'Arcas (Western narrator)'    },
+  comedy:  { narratorVoice: 'athena',  label: 'Athena (Comedy narrator)'    },
 }
 
-// Smart truncation — complete sentences under 2000 chars
-// Deepgram handles longer text than Unreal Speech
-function prepareText(text: string): string {
-  if (text.length <= 2000) return text
+// Character type → voice mapping
+const CHARACTER_VOICES: Record<string, string> = {
+  NARRATOR:    '', // set per genre
+  PLAYER:      'orion',   // confident male
+  MASTERMIND:  'orion',
+  COMMANDER:   'perseus',
+  SHERIFF:     'arcas',
+  CONFUSED:    'zeus',
+  KEEPER:      'helios',
+  SAFE:        'helios',
+  ANDROID:     'helios',
+  COACH:       'eric',
+  BARKEEP:     'eric',
+  CONTROL:     'zeus',
+  LOOKOUT:     'zeus',
+  OUTLAW:      'orpheus',
+  REFEREE:     'zeus',
+  CROWD:       'thalia',
+  FAN:         'thalia',
+}
 
-  // Try full first two paragraphs
-  const paragraphs = text.split(/\n\n+/).filter(p => p.trim().length > 0)
-  let result = ''
-  for (const para of paragraphs) {
-    const candidate = result ? `${result}\n\n${para.trim()}` : para.trim()
-    if (candidate.length > 1900) break
-    result = candidate
+interface ScriptSegment {
+  speaker: string
+  text: string
+  voice: string
+}
+
+// Parse [SPEAKER] or [SPEAKER:Name] tags
+export function parseScript(
+  script: string,
+  genre: string
+): ScriptSegment[] {
+  const config        = GENRE_CONFIG[genre] ?? GENRE_CONFIG.heist
+  const narratorVoice = config.narratorVoice
+
+  const lines    = script.split('\n').filter(l => l.trim())
+  const segments: ScriptSegment[] = []
+  let buffer = ''
+  let currentSpeaker = 'NARRATOR'
+  let currentVoice   = narratorVoice
+
+  for (const line of lines) {
+    // Match [SPEAKER] or [SPEAKER:NAME] at start of line
+    const tagMatch = line.match(/^\[([A-Z]+)(?::([^\]]+))?\](.*)$/)
+
+    if (tagMatch) {
+      // Save previous buffer
+      if (buffer.trim()) {
+        segments.push({ speaker: currentSpeaker, text: buffer.trim(), voice: currentVoice })
+        buffer = ''
+      }
+
+      const speakerType = tagMatch[1]
+      const remainder   = (tagMatch[3] ?? '').trim()
+
+      currentSpeaker = speakerType
+      currentVoice   = speakerType === 'NARRATOR'
+        ? narratorVoice
+        : (CHARACTER_VOICES[speakerType] ?? narratorVoice)
+
+      if (remainder) buffer = remainder + ' '
+    } else {
+      buffer += line + ' '
+    }
   }
 
-  if (result) return result
+  if (buffer.trim()) {
+    segments.push({ speaker: currentSpeaker, text: buffer.trim(), voice: currentVoice })
+  }
 
-  // Fallback: truncate at last sentence under 1900 chars
-  const truncated = text.slice(0, 1900)
-  const lastSentence = truncated.search(/[.!?][^.!?]*$/)
-  return lastSentence > 200 ? truncated.slice(0, lastSentence + 1) : truncated
+  // Fallback: if no tags found, treat as single narrator block
+  if (segments.length === 0 && script.trim()) {
+    segments.push({
+      speaker: 'NARRATOR',
+      text:    script.slice(0, 1800),
+      voice:   narratorVoice,
+    })
+  }
+
+  return segments
+}
+
+// Call Deepgram for one segment
+async function synthesiseSegment(
+  text: string,
+  voice: string
+): Promise<ArrayBuffer | null> {
+  const truncated = text.slice(0, 900) // safe limit per segment
+
+  for (let attempt = 0; attempt < KEYS.length; attempt++) {
+    const key = nextKey()
+    if (!key) return null
+
+    try {
+      const res = await fetch(
+        `https://api.deepgram.com/v1/speak?model=aura-2-${voice}-en`,
+        {
+          method:  'POST',
+          headers: {
+            'Authorization': `Token ${key}`,
+            'Content-Type':  'text/plain',
+          },
+          body: truncated,
+        }
+      )
+
+      if (res.status === 402 || res.status === 429) continue
+      if (!res.ok) return null
+
+      return await res.arrayBuffer()
+    } catch {
+      if (attempt < KEYS.length - 1) continue
+      return null
+    }
+  }
+  return null
 }
 
 export interface TTSResult {
-  audioDataUri: string | null
-  error?: string
-  voiceUsed?: string
+  audioDataUri:   string | null
+  error?:         string
+  voicesUsed?:    string[]
+  segmentCount?:  number
   originalLength?: number
-  usedLength?: number
 }
 
+// Main export — multi-voice synthesis
 export async function textToSpeech(
   text: string,
   genre: string = 'heist'
 ): Promise<TTSResult> {
-  if (KEYS.length === 0) {
+  if (!KEYS.length) {
     return {
       audioDataUri: null,
-      error: 'No DEEPGRAM_API_KEY configured. Add DEEPGRAM_API_KEY_1 to Vercel environment variables.',
+      error: 'No DEEPGRAM_API_KEY configured. Add DEEPGRAM_API_KEY_1 to Vercel.',
     }
   }
 
-  const config   = GENRE_CONFIG[genre] ?? GENRE_CONFIG.heist
-  const prepared = prepareText(text)
-  const model    = `aura-2-${config.voice}-en`
+  const segments = parseScript(text, genre)
 
-  for (let attempt = 0; attempt < KEYS.length; attempt++) {
-    const key = nextKey()
-    if (!key) continue
-
-    try {
-      const res = await fetch(
-        `https://api.deepgram.com/v1/speak?model=${model}`,
-        {
-          method: 'POST',
-          headers: {
-            // Deepgram uses "Token" not "Bearer"
-            'Authorization': `Token ${key}`,
-            'Content-Type': 'text/plain',
-          },
-          body: prepared, // plain text body
-        }
-      )
-
-      // Quota exceeded — try next key
-      if (res.status === 402 || res.status === 429) {
-        continue
-      }
-
-      if (!res.ok) {
-        const errText = await res.text()
-        let errMsg = `HTTP ${res.status}`
-        try {
-          const errJson = JSON.parse(errText)
-          errMsg = errJson.err_msg ?? errJson.message ?? errMsg
-        } catch {
-          errMsg = errText.slice(0, 150) || errMsg
-        }
-
-        // Don't retry auth errors — wrong key
-        if (res.status === 401 || res.status === 403) {
-          return {
-            audioDataUri: null,
-            error: `Invalid Deepgram API key. Check DEEPGRAM_API_KEY_${attempt + 1} in Vercel.`,
-          }
-        }
-
-        throw new Error(errMsg)
-      }
-
-      // Deepgram streams raw MP3 bytes directly
-      const arrayBuffer = await res.arrayBuffer()
-
-      if (arrayBuffer.byteLength === 0) {
-        throw new Error('Empty audio response from Deepgram')
-      }
-
-      // Convert to base64 data URI
-      const base64  = Buffer.from(arrayBuffer).toString('base64')
-      const dataUri = `data:audio/mpeg;base64,${base64}`
-
-      return {
-        audioDataUri:   dataUri,
-        voiceUsed:      `${config.label} · ${config.description}`,
-        originalLength: text.length,
-        usedLength:     prepared.length,
-      }
-
-    } catch (err: unknown) {
-      // Try next key on network errors
-      if (attempt < KEYS.length - 1) continue
-      return {
-        audioDataUri: null,
-        error: err instanceof Error ? err.message : 'TTS request failed',
-      }
-    }
+  if (!segments.length) {
+    return { audioDataUri: null, error: 'No segments found in script' }
   }
+
+  // Synthesise all segments in parallel
+  const audioBuffers = await Promise.all(
+    segments.map(seg => synthesiseSegment(seg.text, seg.voice))
+  )
+
+  // Filter out failures
+  const validBuffers = audioBuffers.filter((b): b is ArrayBuffer => b !== null)
+
+  if (!validBuffers.length) {
+    return { audioDataUri: null, error: 'All Deepgram calls failed. Check API keys.' }
+  }
+
+  // Concatenate all MP3 buffers
+  const totalBytes = validBuffers.reduce((sum, buf) => sum + buf.byteLength, 0)
+  const merged     = new Uint8Array(totalBytes)
+  let offset       = 0
+  for (const buf of validBuffers) {
+    merged.set(new Uint8Array(buf), offset)
+    offset += buf.byteLength
+  }
+
+  const base64  = Buffer.from(merged).toString('base64')
+  const dataUri = `data:audio/mpeg;base64,${base64}`
+
+  const voicesUsed = [...new Set(segments.map(s =>
+    `${s.speaker}→${s.voice}`
+  ))]
 
   return {
-    audioDataUri: null,
-    error: 'All Deepgram API keys exhausted or over quota. Add DEEPGRAM_API_KEY_2 to Vercel.',
+    audioDataUri:    dataUri,
+    voicesUsed,
+    segmentCount:    segments.length,
+    originalLength:  text.length,
   }
 }

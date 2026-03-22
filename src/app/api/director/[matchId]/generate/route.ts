@@ -6,29 +6,64 @@ import { getCache, setCache } from '@/lib/redis'
 export const runtime = 'edge'
 
 const GENRE_PROMPTS: Record<string, string> = {
-  horror: `You are a horror screenwriter. Rewrite this football match as a terrifying horror story.
-Use dark atmosphere, dread, and suspense. The ball is cursed. The goalkeeper is haunted.
-Make it genuinely scary. 3 paragraphs. Cinematic. No football clichés.`,
+  horror: `You are a horror screenwriter. Write the match as a terrifying horror story.
+Use EXACTLY these speaker tags on new lines:
+[NARRATOR] for atmospheric narration
+[PLAYER] when a player speaks (use their real name in parentheses after: [PLAYER:Messi])
+[KEEPER] for the goalkeeper's terrified inner monologue
+[CROWD] for crowd whispers
 
-  romance: `You are a romantic screenwriter. Rewrite this football match as a passionate love story.
-Two teams — star-crossed lovers. Goals are stolen kisses. Cards are heartbreaks.
-Make it sweeping and emotional. 3 paragraphs. Cinematic.`,
+Format STRICTLY like this:
+[NARRATOR] The stadium lights flickered as darkness crept across the pitch.
+[PLAYER:Messi] Something is wrong here. The ball... it breathes.
+[KEEPER] I cannot stop it. No one can stop it.
+[NARRATOR] And then the goal came.
 
-  heist: `You are a crime thriller screenwriter. Rewrite this match as an Ocean's Eleven-style heist.
-The stadium is the vault. The ball is the prize. Each goal is a perfectly executed move.
-Sharp, clever, stylish. 3 paragraphs. Cinematic.`,
+3-4 exchanges. Use actual player names from the match. Be genuinely frightening.`,
 
-  scifi: `You are a sci-fi screenwriter. Rewrite this match as a battle in the far future.
-Players are androids. The pitch is a space station. Goals are quantum events.
-Epic and futuristic. 3 paragraphs. Cinematic.`,
+  romance: `You are a romantic screenwriter. Write the match as a sweeping love story.
+Use EXACTLY these speaker tags:
+[NARRATOR] for poetic narration
+[PLAYER] when a player speaks (yearning, passionate. e.g. [PLAYER:Ronaldo])
+[COACH] for the wise mentor figure
 
-  western: `You are a western screenwriter. Rewrite this match as a classic gunfight showdown.
-Two rival clans. The stadium is a dusty frontier town. Goals are draws at high noon.
-Gritty, tense, sparse dialogue. 3 paragraphs. Cinematic.`,
+Format strictly with tags on new lines. 3-4 exchanges. Use real player names.`,
 
-  comedy: `You are a comedy screenwriter. Rewrite this match as a hilarious farce.
-Everything goes wrong in the funniest possible way. The referee is incompetent.
-The goalkeepers are terrified of the ball. Absurd and funny. 3 paragraphs.`,
+  heist: `You are a crime writer. Write the match as an Ocean's Eleven-style heist.
+Use EXACTLY these speaker tags:
+[NARRATOR] for slick narration
+[MASTERMIND] the captain giving orders (use real captain name: [MASTERMIND:Name])
+[LOOKOUT] the winger calling plays (e.g. [LOOKOUT:Name])
+[SAFE] the goalkeeper as the vault
+
+Format strictly with tags. 3-4 exchanges. Use real player names.`,
+
+  scifi: `You are a sci-fi writer. Write the match as an epic space battle.
+Use EXACTLY these speaker tags:
+[NARRATOR] for epic space narration
+[COMMANDER] the captain as starship commander (e.g. [COMMANDER:Name])
+[ANDROID] an android player giving data readouts (e.g. [ANDROID:Name])
+[CONTROL] mission control commentary
+
+Format strictly with tags. 3-4 exchanges. Use real player names.`,
+
+  western: `You are a western writer. Write the match as a frontier showdown.
+Use EXACTLY these speaker tags:
+[NARRATOR] for dusty western narration
+[SHERIFF] the captain as lawman (e.g. [SHERIFF:Name])
+[OUTLAW] the opposing striker as outlaw (e.g. [OUTLAW:Name])
+[BARKEEP] neutral observer commentary
+
+Format strictly with tags. 3-4 exchanges. Use real player names.`,
+
+  comedy: `You are a comedy writer. Write the match as a hilarious farce.
+Use EXACTLY these speaker tags:
+[NARRATOR] for exasperated narration
+[CONFUSED] a player who has no idea what's happening (e.g. [CONFUSED:Name])
+[REFEREE] the hapless referee
+[FAN] an absurd fan commentary
+
+Format strictly with tags. 3-4 exchanges. Use real player names.`,
 }
 
 export async function POST(

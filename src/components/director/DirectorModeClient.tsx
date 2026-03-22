@@ -1,5 +1,5 @@
 'use client'
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { Flag, FLAG_ISO } from '@/components/ui/Flag'
 
 const GENRES = [
@@ -36,6 +36,132 @@ interface DirectorModeClientProps {
   initialGenre?: string | null
 }
 
+// Web Audio API background generator — no audio files needed
+function createBackgroundSound(
+  audioCtx: AudioContext,
+  genre: string
+): { start: () => void; stop: () => void } {
+  const nodes: AudioNode[] = []
+  const gainNode = audioCtx.createGain()
+  gainNode.gain.value = 0.12 // subtle background level
+  gainNode.connect(audioCtx.destination)
+
+  function createOsc(freq: number, type: OscillatorType, gainVal: number) {
+    const osc  = audioCtx.createOscillator()
+    const gain = audioCtx.createGain()
+    osc.type      = type
+    osc.frequency.value = freq
+    gain.gain.value     = gainVal
+    osc.connect(gain)
+    gain.connect(gainNode)
+    nodes.push(osc, gain)
+    return osc
+  }
+
+  function setupHorror() {
+    // Low drone + slow LFO pulse
+    const drone = createOsc(55, 'sawtooth', 0.3)
+    const lfo   = audioCtx.createOscillator()
+    const lfoG  = audioCtx.createGain()
+    lfo.frequency.value = 0.3
+    lfoG.gain.value     = 20
+    lfo.connect(lfoG)
+    lfoG.connect(drone.frequency)
+    nodes.push(lfo, lfoG)
+    // High unsettling tone
+    createOsc(880, 'sine', 0.05)
+    lfo.start(); drone.start()
+  }
+
+  function setupRomance() {
+    // Soft chords — piano-like
+    [261.6, 329.6, 392.0].forEach((freq, i) => {
+      const osc = audioCtx.createOscillator()
+      const env = audioCtx.createGain()
+      osc.type = 'sine'
+      osc.frequency.value = freq
+      env.gain.setValueAtTime(0, audioCtx.currentTime)
+      env.gain.linearRampToValueAtTime(0.15, audioCtx.currentTime + 0.5 + i * 0.1)
+      osc.connect(env)
+      env.connect(gainNode)
+      nodes.push(osc, env)
+      osc.start()
+    })
+  }
+
+  function setupHeist() {
+    // Ticking rhythm + bass
+    const bass = createOsc(80, 'triangle', 0.4)
+    bass.start()
+    // Rhythm using gain automation
+    const ticker = audioCtx.createOscillator()
+    const tickGain = audioCtx.createGain()
+    ticker.frequency.value = 800
+    tickGain.gain.value    = 0
+    ticker.connect(tickGain)
+    tickGain.connect(gainNode)
+    nodes.push(ticker, tickGain)
+    ticker.start()
+    // Pulse every 0.5s for 60 pulses
+    let t = audioCtx.currentTime
+    for (let i = 0; i < 60; i++) {
+      tickGain.gain.setValueAtTime(0.2, t)
+      tickGain.gain.setValueAtTime(0,   t + 0.05)
+      t += 0.5
+    }
+  }
+
+  function setupScifi() {
+    // Space drone — slow sweep
+    const sweep = createOsc(110, 'sine', 0.3)
+    sweep.frequency.linearRampToValueAtTime(220, audioCtx.currentTime + 8)
+    sweep.start()
+    createOsc(55, 'sine', 0.2).start()
+  }
+
+  function setupWestern() {
+    // Wind-like filtered noise via multiple detuned oscillators
+    [196, 220, 247].forEach(freq => {
+      const osc = createOsc(freq, 'sawtooth', 0.08)
+      osc.detune.value = Math.random() * 20 - 10
+      osc.start()
+    })
+  }
+
+  function setupComedy() {
+    // Bouncy major chord arpeggios
+    const notes = [261.6, 329.6, 392.0, 523.3]
+    notes.forEach((freq, i) => {
+      const osc = audioCtx.createOscillator()
+      const env = audioCtx.createGain()
+      osc.type = 'triangle'
+      osc.frequency.value = freq
+      env.gain.value = 0.1
+      osc.connect(env)
+      env.connect(gainNode)
+      nodes.push(osc, env)
+      osc.start(audioCtx.currentTime + i * 0.15)
+    })
+  }
+
+  const SETUP: Record<string, () => void> = {
+    horror: setupHorror, romance: setupRomance, heist: setupHeist,
+    scifi: setupScifi, western: setupWestern, comedy: setupComedy,
+  }
+
+  return {
+    start: () => { (SETUP[genre] ?? setupHeist)() },
+    stop:  () => {
+      gainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 1)
+      setTimeout(() => {
+        nodes.forEach(n => {
+          try { (n as OscillatorNode).stop?.() } catch {}
+        })
+      }, 1100)
+    },
+  }
+}
+
 export function DirectorModeClient({ match, initialGenre }: DirectorModeClientProps) {
   const [selectedGenre, setSelectedGenre] = useState<string | null>(initialGenre ?? null)
   const [script, setScript]               = useState('')
@@ -48,11 +174,12 @@ export function DirectorModeClient({ match, initialGenre }: DirectorModeClientPr
   const [audioStatus, setAudioStatus]     = useState('')
   const [audioDataUri, setAudioDataUri]   = useState<string | null>(null)
   const [voiceUsed, setVoiceUsed]         = useState('')
-  const [narrationInfo, setNarrationInfo] = useState<{
-    originalLength: number
-    usedLength: number
-  } | null>(null)
-  const audioRef = useRef<HTMLAudioElement>(null)
+  const [voicesInfo, setVoicesInfo]       = useState<string[]>([])
+  const [bgEnabled, setBgEnabled]         = useState(true)
+
+  const audioRef    = useRef<HTMLAudioElement>(null)
+  const audioCtxRef = useRef<AudioContext | null>(null)
+  const bgSoundRef  = useRef<{ start: () => void; stop: () => void } | null>(null)
 
   const genre = GENRES.find(g => g.id === selectedGenre)
 
@@ -64,8 +191,8 @@ export function DirectorModeClient({ match, initialGenre }: DirectorModeClientPr
     setAudioDataUri(null)
     setAudioError('')
     setVoiceUsed('')
-    setNarrationInfo(null)
-    setAudioStatus('Writing screenplay...')
+    setVoicesInfo([])
+    setAudioStatus('Writing multi-voice screenplay...')
 
     try {
       // Step 1: Generate screenplay via Groq
@@ -82,10 +209,9 @@ export function DirectorModeClient({ match, initialGenre }: DirectorModeClientPr
       setScript(generatedScript)
       setCached(scriptData.cached ?? false)
       
-      // Pivot to narration state
       setLoading(false)
       setAudioLoading(true)
-      setAudioStatus('Narrating with Deepgram Aura-2...')
+      setAudioStatus('Narrating with Deepgram Aura-2 cast...')
 
       // Step 2: Generate audio immediately
       const audioRes = await fetch(`/api/director/${match.id}/narrate`, {
@@ -98,8 +224,7 @@ export function DirectorModeClient({ match, initialGenre }: DirectorModeClientPr
       let audioData: {
         audioDataUri?: string | null
         voiceUsed?: string
-        originalLength?: number
-        usedLength?: number
+        voicesUsed?: string[]
         error?: string
         debug?: Record<string, unknown>
       } = {}
@@ -107,19 +232,14 @@ export function DirectorModeClient({ match, initialGenre }: DirectorModeClientPr
       try {
         audioData = JSON.parse(rawAudio)
       } catch {
-        setAudioError(`Server error: ${rawAudio.slice(0, 100)}`)
+        setAudioError(`Server error (not JSON): ${rawAudio.slice(0, 100)}`)
         return
       }
 
       if (audioData.audioDataUri) {
         setAudioDataUri(audioData.audioDataUri)
         setVoiceUsed(audioData.voiceUsed ?? '')
-        if (audioData.originalLength && audioData.usedLength) {
-          setNarrationInfo({
-            originalLength: audioData.originalLength,
-            usedLength: audioData.usedLength,
-          })
-        }
+        if (audioData.voicesUsed) setVoicesInfo(audioData.voicesUsed)
       } else {
         let errMsg = audioData.error ?? 'Audio generation failed'
         if (errMsg.includes('No DEEPGRAM_API_KEY')) {
@@ -145,11 +265,26 @@ export function DirectorModeClient({ match, initialGenre }: DirectorModeClientPr
   function togglePlay() {
     const audio = audioRef.current
     if (!audio) return
+
     if (isPlaying) {
       audio.pause()
+      bgSoundRef.current?.stop()
       setIsPlaying(false)
     } else {
-      audio.play()
+      if (!audioCtxRef.current) {
+        audioCtxRef.current = new AudioContext()
+      }
+      
+      bgSoundRef.current?.stop() // safety stop
+      const bg = createBackgroundSound(audioCtxRef.current, selectedGenre ?? 'heist')
+      bgSoundRef.current = bg
+      if (bgEnabled) bg.start()
+      
+      audio.play().catch(e => {
+        console.error('Playback failed:', e)
+        setIsPlaying(false)
+        bgSoundRef.current?.stop()
+      })
       setIsPlaying(true)
     }
   }
@@ -196,13 +331,12 @@ export function DirectorModeClient({ match, initialGenre }: DirectorModeClientPr
         </div>
       </div>
 
-      {/* Genre selector */}
       <p style={{
         fontSize: 10, fontWeight: 700, color: 'var(--text-3)',
         textTransform: 'uppercase', letterSpacing: '0.08em',
         marginBottom: 12,
       }}>
-        Choose a genre to generate & narrate
+        Choose a genre for a multi-voice screenplay
       </p>
       <div style={{
         display: 'grid',
@@ -224,18 +358,6 @@ export function DirectorModeClient({ match, initialGenre }: DirectorModeClientPr
               transition: 'all 0.15s',
               opacity: (loading || audioLoading) && selectedGenre !== g.id ? 0.5 : 1,
             }}
-            onMouseEnter={e => {
-              if (!loading && !audioLoading) {
-                const el = e.currentTarget as HTMLButtonElement
-                el.style.borderColor = g.color
-                el.style.transform = 'translateY(-2px)'
-              }
-            }}
-            onMouseLeave={e => {
-              const el = e.currentTarget as HTMLButtonElement
-              el.style.borderColor = selectedGenre === g.id ? g.color : 'var(--border)'
-              el.style.transform = 'none'
-            }}
           >
             <div style={{ fontSize: 24, marginBottom: 6 }}>{g.emoji}</div>
             <div style={{
@@ -250,13 +372,12 @@ export function DirectorModeClient({ match, initialGenre }: DirectorModeClientPr
               fontSize: 9, color: 'var(--text-3)', marginTop: 4,
               fontStyle: 'italic',
             }}>
-              Voice: {g.voice} (Aura-2)
+              Cast: Multi-Voice (Aura-2)
             </div>
           </button>
         ))}
       </div>
 
-      {/* Global Loading State */}
       {(loading || audioLoading) && (
         <div style={{
           background: 'var(--bg-card)', border: '1px solid var(--border)',
@@ -277,15 +398,14 @@ export function DirectorModeClient({ match, initialGenre }: DirectorModeClientPr
             ))}
           </div>
           <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 4 }}>
-            {audioStatus || (loading ? `${genre?.emoji} Writing screenplay...` : 'Generating audio...')}
+            {audioStatus || (loading ? `${genre?.emoji} Writing script...` : 'Generating audio...')}
           </div>
           <div style={{ fontSize: 11, color: 'var(--text-3)' }}>
-            {loading ? 'Groq is writing your script' : 'Deepgram Aura-2 is narrating'}
+            {loading ? 'Cast is rehearsing' : 'Deepgram Aura-2 is recording lines'}
           </div>
         </div>
       )}
 
-      {/* Error */}
       {error && (
         <div style={{
           background: 'rgba(220,38,38,0.08)',
@@ -297,11 +417,8 @@ export function DirectorModeClient({ match, initialGenre }: DirectorModeClientPr
         </div>
       )}
 
-      {/* Generated screenplay + Audio Player */}
       {script && genre && (
         <div style={{ marginBottom: 20 }}>
-
-          {/* Script display */}
           <div style={{
             background: 'var(--bg-card)',
             border: `1px solid ${genre.color}44`,
@@ -321,10 +438,10 @@ export function DirectorModeClient({ match, initialGenre }: DirectorModeClientPr
                   fontSize: 12, fontWeight: 800,
                   color: genre.color,
                 }}>
-                  {genre.name.toUpperCase()} MODE
+                  {genre.name.toUpperCase()} REPLAY
                 </div>
                 <div style={{ fontSize: 10, color: 'var(--text-3)' }}>
-                  Voice: {genre.voice} · {cached ? '🟡 Cached' : '🟢 Generated now'}
+                  {cached ? '🟡 From Archive' : '🟢 Fresh Script'}
                 </div>
               </div>
               <button
@@ -337,23 +454,21 @@ export function DirectorModeClient({ match, initialGenre }: DirectorModeClientPr
                   borderRadius: 8, padding: '5px 10px',
                   fontSize: 11, color: 'var(--text-2)',
                   cursor: (loading || audioLoading) ? 'not-allowed' : 'pointer',
-                  opacity: (loading || audioLoading) ? 0.5 : 1,
                 }}
               >
-                🔄 Regenerate
+                🔄 Rewrite
               </button>
             </div>
 
             <div style={{
               fontSize: 14, color: 'var(--text)',
               lineHeight: 1.8, whiteSpace: 'pre-wrap',
-              fontFamily: 'Georgia, serif',
+              fontFamily: 'monospace', fontSize: 12,
             }}>
               {script}
             </div>
           </div>
 
-          {/* Audio Player and Errors */}
           <div style={{
             background: 'var(--bg-card)', border: '1px solid var(--border)',
             borderRadius: 14, padding: '14px 16px',
@@ -376,7 +491,7 @@ export function DirectorModeClient({ match, initialGenre }: DirectorModeClientPr
                     borderRadius: 6, padding: '4px 8px', cursor: 'pointer'
                   }}
                 >
-                  Retry Narration
+                  Retry Cast Recording
                 </button>
               </div>
             )}
@@ -388,7 +503,10 @@ export function DirectorModeClient({ match, initialGenre }: DirectorModeClientPr
                   src={audioDataUri}
                   onPlay={() => setIsPlaying(true)}
                   onPause={() => setIsPlaying(false)}
-                  onEnded={() => setIsPlaying(false)}
+                  onEnded={() => {
+                    setIsPlaying(false)
+                    bgSoundRef.current?.stop()
+                  }}
                   style={{ display: 'none' }}
                 />
 
@@ -414,15 +532,16 @@ export function DirectorModeClient({ match, initialGenre }: DirectorModeClientPr
 
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginBottom: 2 }}>
-                      {genre?.emoji} {genre?.name} Narration
+                       Cinematic Match Narration
                     </div>
-                    <div style={{ fontSize: 10, color: 'var(--text-3)' }}>
-                      {voiceUsed || `${genre?.voice} (Aura-2)`}
-                      {isPlaying && (
-                        <span style={{ marginLeft: 8, color: genre?.color }}>
-                          ● Playing...
-                        </span>
-                      )}
+                    <div style={{ fontSize: 10, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                       Aura-2 Multi-Voice
+                       {isPlaying && (
+                         <span style={{ color: genre?.color, display: 'flex', alignItems: 'center', gap: 4 }}>
+                           <span className="pulse" style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor' }} />
+                           Now Playing
+                         </span>
+                       )}
                     </div>
                   </div>
 
@@ -430,7 +549,7 @@ export function DirectorModeClient({ match, initialGenre }: DirectorModeClientPr
                     onClick={() => {
                       const link = document.createElement('a')
                       link.href = audioDataUri
-                      link.download = `kickoffto-${genre?.id}-narration.mp3`
+                      link.download = `kickoffto-${genre?.id}-cinematic.mp3`
                       link.click()
                     }}
                     style={{
@@ -445,80 +564,64 @@ export function DirectorModeClient({ match, initialGenre }: DirectorModeClientPr
                   </button>
                 </div>
 
-                {narrationInfo && narrationInfo.originalLength > narrationInfo.usedLength && (
-                  <div style={{
-                    fontSize: 9, color: 'var(--text-3)', marginTop: 6, textAlign: 'center',
-                  }}>
-                    Narrating first {narrationInfo.usedLength} of {narrationInfo.originalLength} chars
-                  </div>
-                )}
+                <div style={{ marginTop: 8, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <button
+                    onClick={() => {
+                      const newState = !bgEnabled
+                      setBgEnabled(newState)
+                      if (isPlaying) {
+                        if (newState) {
+                          const bg = createBackgroundSound(audioCtxRef.current!, selectedGenre!)
+                          bgSoundRef.current = bg
+                          bg.start()
+                        } else {
+                          bgSoundRef.current?.stop()
+                        }
+                      }
+                    }}
+                    style={{
+                      background: bgEnabled ? 'rgba(34,197,94,0.1)' : 'var(--bg-elevated)',
+                      border: `1px solid ${bgEnabled ? 'var(--green)' : 'var(--border)'}`,
+                      borderRadius: 8, padding: '5px 10px',
+                      fontSize: 11, color: bgEnabled ? 'var(--green)' : 'var(--text-3)',
+                      cursor: 'pointer', fontWeight: 600,
+                    }}
+                  >
+                    🎵 {bgEnabled ? 'Atmosphere ON' : 'Atmosphere OFF'}
+                  </button>
+
+                  {voicesInfo.length > 0 && (
+                    <div style={{ fontSize: 9, color: 'var(--text-3)', display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                      {voicesInfo.slice(0, 4).map(v => (
+                        <span key={v} style={{
+                          background: 'var(--bg-elevated)', borderRadius: 4, padding: '2px 6px',
+                        }}>
+                          {v}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
-            
-            {!audioDataUri && !audioLoading && !audioError && (
-               <div style={{ fontSize: 11, color: 'var(--text-3)', textAlign: 'center' }}>
-                 Audio narrated by Deepgram Aura-2
-               </div>
-            )}
           </div>
-
-          <p style={{
-            fontSize: 9, color: 'var(--text-3)',
-            textAlign: 'center', marginTop: 8,
-          }}>
-            Audio by <a href="https://deepgram.com" target="_blank"
-              rel="noopener noreferrer"
-              style={{ color: 'var(--text-3)' }}>deepgram.com</a>
-          </p>
         </div>
       )}
-
-      {/* Match events summary if no script yet */}
-      {!script && !loading && !audioLoading && match.events?.length > 0 && (
-        <div style={{
-          background: 'var(--bg-card)', border: '1px solid var(--border)',
-          borderRadius: 12, padding: 16,
-        }}>
-          <p style={{
-            fontSize: 10, fontWeight: 700, color: 'var(--text-3)',
-            textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12,
-          }}>
-            Match events · ready for production
-          </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {match.events.map((event, i) => (
-              <div key={i} style={{
-                display: 'flex', gap: 10, alignItems: 'center',
-                fontSize: 12, color: 'var(--text-2)',
-              }}>
-                <span style={{
-                  fontSize: 10, fontVariantNumeric: 'tabular-nums',
-                  color: 'var(--text-3)', minWidth: 28,
-                }}>
-                  {event.minute}&apos;
-                </span>
-                <span style={{ fontSize: 14 }}>
-                  {event.type === 'goal' ? '⚽'
-                    : event.type === 'yellow' ? '🟡'
-                    : event.type === 'red' ? '🟥' : '↕'}
-                </span>
-                <span style={{ flex: 1 }}>
-                  {event.player}
-                  <span style={{ color: 'var(--text-3)', marginLeft: 6 }}>
-                    · {event.team}
-                  </span>
-                </span>
-              </div>
-            ))}
-          </div>
-          <p style={{
-            fontSize: 11, color: 'var(--text-3)',
-            marginTop: 14, fontStyle: 'italic',
-          }}>
-            Select a genre above to generate the screenplay and narration instantly.
-          </p>
-        </div>
-      )}
+      
+      <style jsx>{`
+        @keyframes typingBounce {
+          0%, 80%, 100% { transform: translateY(0); opacity: 0.3; }
+          40% { transform: translateY(-8px); opacity: 1; }
+        }
+        .pulse {
+          animation: pulseFade 1.5s ease-in-out infinite;
+        }
+        @keyframes pulseFade {
+          0% { opacity: 0.3; }
+          50% { opacity: 1; }
+          100% { opacity: 0.3; }
+        }
+      `}</style>
     </div>
   )
 }
