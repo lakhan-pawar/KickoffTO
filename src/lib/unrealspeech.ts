@@ -83,8 +83,8 @@ export async function textToSpeech(
       const res = await fetch('https://api.v8.unrealspeech.com/stream', {
         method: 'POST',
         headers: {
-          // NO "Bearer" prefix — raw key only (confirmed from working curl)
-          'Authorization': key,
+          // Official v8 API requires Bearer prefix (confirmed via search)
+          'Authorization': `Bearer ${key}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
