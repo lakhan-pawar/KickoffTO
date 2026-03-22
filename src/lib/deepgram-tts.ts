@@ -55,6 +55,26 @@ interface ScriptSegment {
   voice: string
 }
 
+export function cleanScriptForTTS(script: string): string {
+  return script
+    // Remove FADE IN/OUT, CUT TO, etc
+    .replace(/\b(FADE IN|FADE OUT|CUT TO|SMASH CUT|DISSOLVE TO|MATCH CUT)\s*:?/gi, '')
+    // Remove INT. / EXT. scene headings
+    .replace(/^(INT\.|EXT\.)\s+.+$/gm, '')
+    // Remove (stage directions in parentheses)
+    .replace(/\([^)]*\)/g, '')
+    // Remove ALL CAPS character name headers (e.g. "LIONEL" on its own line)
+    // but preserve [TAGS]
+    .replace(/^[A-Z][A-Z\s]{3,}$/gm, '')
+    // Remove "SCENE 1 -" type headings
+    .replace(/^SCENE\s+\d+\s*[-–]?.*/gmi, '')
+    // Clean up multiple blank lines
+    .replace(/\n{3,}/g, '\n\n')
+    // Clean up leading/trailing whitespace per line
+    .split('\n').map(l => l.trim()).join('\n')
+    .trim()
+}
+
 // Parse [SPEAKER] or [SPEAKER:Name] tags
 export function parseScript(
   script: string,
@@ -76,7 +96,11 @@ export function parseScript(
     if (tagMatch) {
       // Save previous buffer
       if (buffer.trim()) {
-        segments.push({ speaker: currentSpeaker, text: buffer.trim(), voice: currentVoice })
+        segments.push({
+          speaker: currentSpeaker,
+          text: buffer.trim().replace(/\([^)]*\)/g, '').replace(/\s+/g, ' ').trim(),
+          voice: currentVoice
+        })
         buffer = ''
       }
 
@@ -95,7 +119,11 @@ export function parseScript(
   }
 
   if (buffer.trim()) {
-    segments.push({ speaker: currentSpeaker, text: buffer.trim(), voice: currentVoice })
+    segments.push({
+      speaker: currentSpeaker,
+      text: buffer.trim().replace(/\([^)]*\)/g, '').replace(/\s+/g, ' ').trim(),
+      voice: currentVoice
+    })
   }
 
   // Fallback: if no tags found, treat as single narrator block
@@ -166,7 +194,8 @@ export async function textToSpeech(
     }
   }
 
-  const segments = parseScript(text, genre)
+  const cleanedText = cleanScriptForTTS(text)
+  const segments    = parseScript(cleanedText, genre)
 
   if (!segments.length) {
     return { audioDataUri: null, error: 'No segments found in script' }

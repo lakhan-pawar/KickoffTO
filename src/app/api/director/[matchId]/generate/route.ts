@@ -6,64 +6,110 @@ import { getCache, setCache } from '@/lib/redis'
 export const runtime = 'edge'
 
 const GENRE_PROMPTS: Record<string, string> = {
-  horror: `You are a horror screenwriter. Write the match as a terrifying horror story.
-Use EXACTLY these speaker tags on new lines:
-[NARRATOR] for atmospheric narration
-[PLAYER] when a player speaks (use their real name in parentheses after: [PLAYER:Messi])
-[KEEPER] for the goalkeeper's terrified inner monologue
-[CROWD] for crowd whispers
+  horror: `You are narrating a horror audio drama about a football match.
+Write as PROSE NARRATION with character dialogue. NO screenplay format.
+NO: FADE IN, CUT TO, INT., EXT., (stage directions), ALL CAPS SCENE HEADINGS.
 
-Format STRICTLY like this:
-[NARRATOR] The stadium lights flickered as darkness crept across the pitch.
-[PLAYER:Messi] Something is wrong here. The ball... it breathes.
-[KEEPER] I cannot stop it. No one can stop it.
-[NARRATOR] And then the goal came.
+Use EXACTLY these speaker tags inline:
+[NARRATOR] for atmospheric narration (2-3 sentences)
+[PLAYER:Name] when a specific player speaks (short, fearful line)
+[KEEPER] for the goalkeeper's terrified thoughts
 
-3-4 exchanges. Use actual player names from the match. Be genuinely frightening.`,
+EXAMPLE FORMAT:
+[NARRATOR] The stadium fell silent as fog crept across the pitch. Something was wrong — the ball pulsed with a dark energy that no one could explain.
+[PLAYER:Messi] The ball... it called to me. I could hear it whispering my name.
+[NARRATOR] He struck it. The net rippled. But the goalkeeper never moved.
+[KEEPER] I wanted to dive. My body simply refused.
 
-  romance: `You are a romantic screenwriter. Write the match as a sweeping love story.
+Write 4-5 exchanges. Use the ACTUAL player names from this match. Be genuinely eerie and atmospheric. Prose only — no screenplay directions.`,
+
+  romance: `You are narrating a romantic audio drama about a football match.
+Write as PROSE NARRATION with character dialogue. NO screenplay format.
+NO: FADE IN, CUT TO, INT., EXT., (stage directions), ALL CAPS SCENE HEADINGS.
+
 Use EXACTLY these speaker tags:
-[NARRATOR] for poetic narration
-[PLAYER] when a player speaks (yearning, passionate. e.g. [PLAYER:Ronaldo])
-[COACH] for the wise mentor figure
+[NARRATOR] for poetic, sweeping narration
+[PLAYER:Name] for passionate, yearning dialogue from specific players
+[COACH] for wise mentor observations
 
-Format strictly with tags on new lines. 3-4 exchanges. Use real player names.`,
+EXAMPLE FORMAT:
+[NARRATOR] Under the floodlights, two teams danced the oldest dance — the pursuit of something just out of reach.
+[PLAYER:Messi] Every touch of the ball tonight felt like a conversation with fate.
+[NARRATOR] And when the goal came, it was not a strike — it was a declaration.
 
-  heist: `You are a crime writer. Write the match as an Ocean's Eleven-style heist.
+Write 4-5 exchanges. Use actual player names. Poetic and emotional prose only.`,
+
+  heist: `You are narrating a heist thriller audio drama about a football match.
+Write as PROSE NARRATION with character dialogue. NO screenplay format.
+NO: FADE IN, CUT TO, INT., EXT., (stage directions), ALL CAPS SCENE HEADINGS.
+
 Use EXACTLY these speaker tags:
-[NARRATOR] for slick narration
-[MASTERMIND] the captain giving orders (use real captain name: [MASTERMIND:Name])
-[LOOKOUT] the winger calling plays (e.g. [LOOKOUT:Name])
-[SAFE] the goalkeeper as the vault
+[NARRATOR] for slick, tense narration
+[MASTERMIND:Name] the captain giving tactical orders
+[LOOKOUT:Name] the winger calling positions
+[SAFE:Name] the goalkeeper as the vault being cracked
 
-Format strictly with tags. 3-4 exchanges. Use real player names.`,
+EXAMPLE FORMAT:
+[NARRATOR] The plan had been months in the making. Sixty thousand witnesses, and not one of them would see it coming.
+[MASTERMIND:Messi] Positions. We go in sixty seconds. Remember — the keeper always moves left.
+[LOOKOUT:Mbappé] South corridor clear. They have no idea.
+[NARRATOR] The pass was surgical. The finish, inevitable.
 
-  scifi: `You are a sci-fi writer. Write the match as an epic space battle.
+Write 4-5 exchanges. Use actual player names. Sharp and tense prose only.`,
+
+  scifi: `You are narrating a science fiction audio drama about a football match.
+Write as PROSE NARRATION with character dialogue. NO screenplay format.
+NO: FADE IN, CUT TO, INT., EXT., (stage directions), ALL CAPS SCENE HEADINGS.
+
 Use EXACTLY these speaker tags:
-[NARRATOR] for epic space narration
-[COMMANDER] the captain as starship commander (e.g. [COMMANDER:Name])
-[ANDROID] an android player giving data readouts (e.g. [ANDROID:Name])
+[NARRATOR] for epic, cosmic narration
+[COMMANDER:Name] the captain as starship commander
+[ANDROID:Name] an android player giving data readouts
 [CONTROL] mission control commentary
 
-Format strictly with tags. 3-4 exchanges. Use real player names.`,
+EXAMPLE FORMAT:
+[NARRATOR] Stardate 2026. Two civilisations meet on the neutral ground of MetLife Station, their conflict watched by four billion across seventeen systems.
+[COMMANDER:Messi] Shields at maximum. We attack in formation delta.
+[ANDROID:Mbappé] Probability of success: 94.7 percent. Initiating sequence.
+[NARRATOR] The quantum strike folded spacetime. The keeper had no frame of reference in which to react.
 
-  western: `You are a western writer. Write the match as a frontier showdown.
+Write 4-5 exchanges. Use actual player names. Epic sci-fi prose only.`,
+
+  western: `You are narrating a western audio drama about a football match.
+Write as PROSE NARRATION with character dialogue. NO screenplay format.
+NO: FADE IN, CUT TO, INT., EXT., (stage directions), ALL CAPS SCENE HEADINGS.
+
 Use EXACTLY these speaker tags:
-[NARRATOR] for dusty western narration
-[SHERIFF] the captain as lawman (e.g. [SHERIFF:Name])
-[OUTLAW] the opposing striker as outlaw (e.g. [OUTLAW:Name])
-[BARKEEP] neutral observer commentary
+[NARRATOR] for dusty, sparse western narration
+[SHERIFF:Name] the captain as the lawman
+[OUTLAW:Name] the opposing striker as the outlaw
+[BARKEEP] a neutral observer at the saloon
 
-Format strictly with tags. 3-4 exchanges. Use real player names.`,
+EXAMPLE FORMAT:
+[NARRATOR] The town of MetLife had seen trouble before. But nothing like this. Two strangers, one ball, and a reckoning sixty minutes in the making.
+[SHERIFF:Messi] I've been waiting for this moment since sunrise, son.
+[OUTLAW:Mbappé] Your move, old man. Town ain't big enough for both our formations.
+[NARRATOR] The shot rang out like a gunshot across the prairie. The keeper never stood a chance.
 
-  comedy: `You are a comedy writer. Write the match as a hilarious farce.
+Write 4-5 exchanges. Use actual player names. Spare, tense western prose only.`,
+
+  comedy: `You are narrating a comedy audio drama about a football match.
+Write as PROSE NARRATION with character dialogue. NO screenplay format.
+NO: FADE IN, CUT TO, INT., EXT., (stage directions), ALL CAPS SCENE HEADINGS.
+
 Use EXACTLY these speaker tags:
-[NARRATOR] for exasperated narration
-[CONFUSED] a player who has no idea what's happening (e.g. [CONFUSED:Name])
-[REFEREE] the hapless referee
-[FAN] an absurd fan commentary
+[NARRATOR] for exasperated, absurdist narration
+[CONFUSED:Name] a bewildered player reacting to chaos
+[REFEREE] the hapless, confused referee
+[FAN] an increasingly hysterical fan in the stands
 
-Format strictly with tags. 3-4 exchanges. Use real player names.`,
+EXAMPLE FORMAT:
+[NARRATOR] Nobody predicted that the biggest crisis of the match would be a rogue pigeon and a referee who had clearly never watched football before.
+[CONFUSED:Messi] Why is there a banana peel on the penalty spot? Why is nobody talking about this?
+[REFEREE] I have reviewed the footage seventeen times and I still cannot explain what happened.
+[FAN] I paid eight hundred dollars for these seats and I have never been happier.
+
+Write 4-5 exchanges. Use actual player names. Absurd, funny prose only.`,
 }
 
 export async function POST(

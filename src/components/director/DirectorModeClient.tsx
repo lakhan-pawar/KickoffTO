@@ -102,7 +102,7 @@ function createBackgroundSound(
     tickGain.connect(gainNode)
     nodes.push(ticker, tickGain)
     ticker.start()
-    // Pulse every 0.5s for 60 pulses
+    // Pulse every 0.5s
     let t = audioCtx.currentTime
     for (let i = 0; i < 60; i++) {
       tickGain.gain.setValueAtTime(0.2, t)
@@ -153,11 +153,7 @@ function createBackgroundSound(
     start: () => { (SETUP[genre] ?? setupHeist)() },
     stop:  () => {
       gainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 1)
-      setTimeout(() => {
-        nodes.forEach(n => {
-          try { (n as OscillatorNode).stop?.() } catch {}
-        })
-      }, 1100)
+      setTimeout(() => nodes.forEach(n => { try { (n as OscillatorNode).stop?.() } catch {} }), 1100)
     },
   }
 }
@@ -170,10 +166,8 @@ export function DirectorModeClient({ match, initialGenre }: DirectorModeClientPr
   const [audioLoading, setAudioLoading]   = useState(false)
   const [audioError, setAudioError]       = useState('')
   const [isPlaying, setIsPlaying]         = useState(false)
-  const [cached, setCached]               = useState(false)
   const [audioStatus, setAudioStatus]     = useState('')
   const [audioDataUri, setAudioDataUri]   = useState<string | null>(null)
-  const [voiceUsed, setVoiceUsed]         = useState('')
   const [voicesInfo, setVoicesInfo]       = useState<string[]>([])
   const [bgEnabled, setBgEnabled]         = useState(true)
 
@@ -183,80 +177,80 @@ export function DirectorModeClient({ match, initialGenre }: DirectorModeClientPr
 
   const genre = GENRES.find(g => g.id === selectedGenre)
 
-  async function generateAndNarrate(genreId: string) {
+  // Step 1: Generate only
+  async function generate(genreId: string) {
     setSelectedGenre(genreId)
     setLoading(true)
     setError('')
     setScript('')
     setAudioDataUri(null)
     setAudioError('')
-    setVoiceUsed('')
     setVoicesInfo([])
-    setAudioStatus('Writing multi-voice screenplay...')
 
     try {
-      // Step 1: Generate screenplay via Groq
-      const scriptRes = await fetch(`/api/director/${match.id}/generate`, {
+      const res = await fetch(`/api/director/${match.id}/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ genre: genreId, match }),
       })
-
-      if (!scriptRes.ok) throw new Error(`Script generation failed: ${scriptRes.status}`)
-
-      const scriptData = await scriptRes.json()
-      const generatedScript = scriptData.script ?? ''
-      setScript(generatedScript)
-      setCached(scriptData.cached ?? false)
-      
+      if (!res.ok) throw new Error(`${res.status}`)
+      const data = await res.json()
+      setScript(data.script ?? '')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Generation failed')
+    } finally {
       setLoading(false)
-      setAudioLoading(true)
-      setAudioStatus('Narrating with Deepgram Aura-2 cast...')
+    }
+  }
 
-      // Step 2: Generate audio immediately
-      const audioRes = await fetch(`/api/director/${match.id}/narrate`, {
+  // Step 2: Narrate only (called manually)
+  async function narrate() {
+    if (!script || !selectedGenre || audioLoading) return
+    setAudioLoading(true)
+    setAudioError('')
+    setAudioDataUri(null)
+    setAudioStatus('Connecting to Deepgram...')
+
+    const slowTimer = setTimeout(() => {
+      setAudioStatus('Synthesising voices... ~5 seconds')
+    }, 3000)
+
+    try {
+      const res = await fetch(`/api/director/${match.id}/narrate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ script: generatedScript, genre: genreId }),
+        body: JSON.stringify({ script, genre: selectedGenre }),
       })
 
-      const rawAudio = await audioRes.text()
-      let audioData: {
+      clearTimeout(slowTimer)
+      const rawText = await res.text()
+      let data: {
         audioDataUri?: string | null
-        voiceUsed?: string
         voicesUsed?: string[]
         error?: string
         debug?: Record<string, unknown>
       } = {}
 
-      try {
-        audioData = JSON.parse(rawAudio)
-      } catch {
-        setAudioError(`Server error (not JSON): ${rawAudio.slice(0, 100)}`)
+      try { data = JSON.parse(rawText) } catch {
+        setAudioError(`Server error: ${rawText.slice(0, 100)}`)
         return
       }
 
-      if (audioData.audioDataUri) {
-        setAudioDataUri(audioData.audioDataUri)
-        setVoiceUsed(audioData.voiceUsed ?? '')
-        if (audioData.voicesUsed) setVoicesInfo(audioData.voicesUsed)
+      if (data.audioDataUri) {
+        setAudioDataUri(data.audioDataUri)
+        setVoicesInfo(data.voicesUsed ?? [])
       } else {
-        let errMsg = audioData.error ?? 'Audio generation failed'
-        if (errMsg.includes('No DEEPGRAM_API_KEY')) {
-          errMsg = '⚙️ Add DEEPGRAM_API_KEY_1 to Vercel environment variables'
-        } else if (errMsg.includes('Invalid Deepgram')) {
-          errMsg = '🔑 Invalid API key. Check console.deepgram.com'
-        } else if (errMsg.includes('quota') || errMsg.includes('exhausted')) {
-          errMsg = '📊 Quota reached. Add DEEPGRAM_API_KEY_2 to Vercel.'
-        }
-        setAudioError(errMsg)
-        if (audioData.debug) console.error('[Deepgram TTS Debug]', audioData.debug)
+        let msg = data.error ?? 'Audio generation failed'
+        if (msg.includes('No DEEPGRAM')) msg = '⚙️ Add DEEPGRAM_API_KEY_1 to Vercel'
+        else if (msg.includes('Invalid')) msg = '🔑 Invalid API key — check console.deepgram.com'
+        else if (msg.includes('quota') || msg.includes('exhausted')) msg = '📊 Quota reached — add DEEPGRAM_API_KEY_2'
+        setAudioError(msg)
+        if (data.debug) console.error('[Deepgram Debug]', data.debug)
       }
-
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Generation failed')
+      clearTimeout(slowTimer)
+      setAudioError(err instanceof Error ? err.message : 'Network error')
     } finally {
-      setLoading(false)
       setAudioLoading(false)
       setAudioStatus('')
     }
@@ -271,11 +265,8 @@ export function DirectorModeClient({ match, initialGenre }: DirectorModeClientPr
       bgSoundRef.current?.stop()
       setIsPlaying(false)
     } else {
-      if (!audioCtxRef.current) {
-        audioCtxRef.current = new AudioContext()
-      }
+      if (!audioCtxRef.current) audioCtxRef.current = new AudioContext()
       
-      bgSoundRef.current?.stop() // safety stop
       const bg = createBackgroundSound(audioCtxRef.current, selectedGenre ?? 'heist')
       bgSoundRef.current = bg
       if (bgEnabled) bg.start()
@@ -289,12 +280,33 @@ export function DirectorModeClient({ match, initialGenre }: DirectorModeClientPr
     }
   }
 
+  function formatScriptForDisplay(raw: string): string {
+    return raw
+      .replace(/\[NARRATOR\]/g,          '📖 Narrator:')
+      .replace(/\[PLAYER:([^\]]+)\]/g,   '⚽ $1:')
+      .replace(/\[MASTERMIND:([^\]]+)\]/g,'🎯 $1:')
+      .replace(/\[COMMANDER:([^\]]+)\]/g, '🚀 $1:')
+      .replace(/\[SHERIFF:([^\]]+)\]/g,   '🤠 $1:')
+      .replace(/\[CONFUSED:([^\]]+)\]/g,  '😕 $1:')
+      .replace(/\[KEEPER\]/g,             '🧤 Keeper:')
+      .replace(/\[SAFE:([^\]]+)\]/g,      '🧤 $1:')
+      .replace(/\[ANDROID:([^\]]+)\]/g,   '🤖 $1:')
+      .replace(/\[COACH\]/g,              '📋 Coach:')
+      .replace(/\[CONTROL\]/g,            '🎙️ Control:')
+      .replace(/\[LOOKOUT:([^\]]+)\]/g,   '👁️ $1:')
+      .replace(/\[OUTLAW:([^\]]+)\]/g,    '🔫 $1:')
+      .replace(/\[BARKEEP\]/g,            '🍺 Barkeep:')
+      .replace(/\[REFEREE\]/g,            '🟥 Referee:')
+      .replace(/\[FAN\]/g,                '📣 Fan:')
+      .replace(/\[CROWD\]/g,              '👥 Crowd:')
+      .replace(/\[([^\]]+)\]/g,           '🎭 $1:') // fallback
+  }
+
   const homeIso = FLAG_ISO[match.homeTeam.code?.toUpperCase()] ?? 'un'
   const awayIso = FLAG_ISO[match.awayTeam.code?.toUpperCase()] ?? 'un'
 
   return (
     <div style={{ maxWidth: 720, margin: '0 auto' }}>
-
       {/* Match header */}
       <div style={{
         background: 'var(--bg-card)', border: '1px solid var(--border)',
@@ -304,323 +316,127 @@ export function DirectorModeClient({ match, initialGenre }: DirectorModeClientPr
         <div style={{ textAlign: 'center' }}>
           <img src={`https://flagcdn.com/w80/${homeIso}.png`} alt={match.homeTeam.name}
             width={48} height={34} style={{ objectFit: 'cover', borderRadius: 5, marginBottom: 6, boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }} />
-          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
-            {match.homeTeam.name}
-          </div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{match.homeTeam.name}</div>
         </div>
-
         <div style={{ textAlign: 'center' }}>
-          <div style={{
-            fontFamily: 'var(--font-display)', fontWeight: 900,
-            fontSize: 36, color: 'var(--text)', letterSpacing: -2,
-            fontVariantNumeric: 'tabular-nums',
-          }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: 36, color: 'var(--text)', letterSpacing: -2 }}>
             {match.homeScore} – {match.awayScore}
           </div>
-          <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 2 }}>
-            {match.round} · {match.venue}
-          </div>
+          <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 2 }}>{match.round} · {match.venue}</div>
         </div>
-
         <div style={{ textAlign: 'center' }}>
           <img src={`https://flagcdn.com/w80/${awayIso}.png`} alt={match.awayTeam.name}
             width={48} height={34} style={{ objectFit: 'cover', borderRadius: 5, marginBottom: 6, boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }} />
-          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
-            {match.awayTeam.name}
-          </div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{match.awayTeam.name}</div>
         </div>
       </div>
 
-      <p style={{
-        fontSize: 10, fontWeight: 700, color: 'var(--text-3)',
-        textTransform: 'uppercase', letterSpacing: '0.08em',
-        marginBottom: 12,
-      }}>
-        Choose a genre for a multi-voice screenplay
+      <p style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>
+        Choose a genre for a prose radio play
       </p>
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
-        gap: 8, marginBottom: 20,
-      }}>
+      
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 8, marginBottom: 20 }}>
         {GENRES.map(g => (
-          <button
-            key={g.id}
-            onClick={() => generateAndNarrate(g.id)}
-            disabled={loading || audioLoading}
+          <button key={g.id} onClick={() => generate(g.id)} disabled={loading || audioLoading}
             style={{
-              background: selectedGenre === g.id
-                ? g.color + '22' : 'var(--bg-card)',
+              background: selectedGenre === g.id ? g.color + '22' : 'var(--bg-card)',
               border: `1px solid ${selectedGenre === g.id ? g.color : 'var(--border)'}`,
-              borderRadius: 12, padding: '12px 14px',
-              cursor: (loading || audioLoading) ? 'not-allowed' : 'pointer',
-              textAlign: 'left',
-              transition: 'all 0.15s',
-              opacity: (loading || audioLoading) && selectedGenre !== g.id ? 0.5 : 1,
-            }}
-          >
+              borderRadius: 12, padding: '12px 14px', cursor: (loading || audioLoading) ? 'not-allowed' : 'pointer',
+              textAlign: 'left', transition: 'all 0.15s', opacity: (loading || audioLoading) && selectedGenre !== g.id ? 0.5 : 1,
+            }}>
             <div style={{ fontSize: 24, marginBottom: 6 }}>{g.emoji}</div>
-            <div style={{
-              fontSize: 13, fontWeight: 700,
-              color: selectedGenre === g.id ? g.color : 'var(--text)',
-              marginBottom: 2,
-            }}>
-              {g.name}
-            </div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: selectedGenre === g.id ? g.color : 'var(--text)', marginBottom: 2 }}>{g.name}</div>
             <div style={{ fontSize: 10, color: 'var(--text-3)' }}>{g.desc}</div>
-            <div style={{
-              fontSize: 9, color: 'var(--text-3)', marginTop: 4,
-              fontStyle: 'italic',
-            }}>
-              Cast: Multi-Voice (Aura-2)
-            </div>
           </button>
         ))}
       </div>
 
-      {(loading || audioLoading) && (
-        <div style={{
-          background: 'var(--bg-card)', border: '1px solid var(--border)',
-          borderRadius: 14, padding: '24px 20px', textAlign: 'center',
-          marginBottom: 20,
-        }}>
-          <div style={{
-            display: 'flex', gap: 6, justifyContent: 'center',
-            alignItems: 'center', marginBottom: 12,
-          }}>
+      {loading && (
+        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 14, padding: '24px 20px', textAlign: 'center', marginBottom: 20 }}>
+          <div style={{ display: 'flex', gap: 6, justifyContent: 'center', alignItems: 'center', marginBottom: 12 }}>
             {[0,1,2].map(i => (
-              <span key={i} style={{
-                width: 8, height: 8, borderRadius: '50%',
-                background: genre?.color ?? 'var(--green)',
-                display: 'inline-block',
-                animation: `typingBounce 0.6s ease-in-out ${i*0.15}s infinite`,
-              }} />
+              <span key={i} style={{ width: 8, height: 8, borderRadius: '50%', background: genre?.color ?? 'var(--green)', animation: `typingBounce 0.6s ease-in-out ${i*0.15}s infinite` }} />
             ))}
           </div>
-          <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 4 }}>
-            {audioStatus || (loading ? `${genre?.emoji} Writing script...` : 'Generating audio...')}
-          </div>
-          <div style={{ fontSize: 11, color: 'var(--text-3)' }}>
-            {loading ? 'Cast is rehearsing' : 'Deepgram Aura-2 is recording lines'}
-          </div>
+          <div style={{ fontSize: 13, color: 'var(--text-2)' }}>{genre?.emoji} Writing dramatic prose...</div>
         </div>
       )}
 
-      {error && (
-        <div style={{
-          background: 'rgba(220,38,38,0.08)',
-          border: '1px solid rgba(220,38,38,0.25)',
-          borderRadius: 12, padding: '12px 16px',
-          fontSize: 13, color: '#f87171', marginBottom: 20,
-        }}>
-          {error}
-        </div>
-      )}
+      {error && <div style={{ background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.25)', borderRadius: 12, padding: '12px 16px', fontSize: 13, color: '#f87171', marginBottom: 20 }}>{error}</div>}
 
       {script && genre && (
-        <div style={{ marginBottom: 20 }}>
-          <div style={{
-            background: 'var(--bg-card)',
-            border: `1px solid ${genre.color}44`,
-            borderTop: `3px solid ${genre.color}`,
-            borderRadius: '0 0 16px 16px',
-            padding: '20px',
-            marginBottom: 14,
-            position: 'relative',
-          }}>
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 8,
-              marginBottom: 16,
-            }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, alignItems: 'start', marginBottom: 40 }} className="desktop-split">
+          {/* Script Column */}
+          <div style={{ background: 'var(--bg-card)', border: `1px solid ${genre.color}33`, borderTop: `4px solid ${genre.color}`, borderRadius: '0 0 16px 16px', padding: '20px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
               <span style={{ fontSize: 20 }}>{genre.emoji}</span>
-              <div>
-                <div style={{
-                  fontSize: 12, fontWeight: 800,
-                  color: genre.color,
-                }}>
-                  {genre.name.toUpperCase()} REPLAY
-                </div>
-                <div style={{ fontSize: 10, color: 'var(--text-3)' }}>
-                  {cached ? '🟡 From Archive' : '🟢 Fresh Script'}
-                </div>
-              </div>
-              <button
-                onClick={() => generateAndNarrate(genre.id)}
-                disabled={loading || audioLoading}
-                style={{
-                  marginLeft: 'auto',
-                  background: 'var(--bg-elevated)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 8, padding: '5px 10px',
-                  fontSize: 11, color: 'var(--text-2)',
-                  cursor: (loading || audioLoading) ? 'not-allowed' : 'pointer',
-                }}
-              >
-                🔄 Rewrite
-              </button>
+              <div style={{ fontSize: 12, fontWeight: 800, color: genre.color }}>{genre.name.toUpperCase()} AUDIO DRAMA</div>
             </div>
-
-            <div style={{
-              fontSize: 14, color: 'var(--text)',
-              lineHeight: 1.8, whiteSpace: 'pre-wrap',
-              fontFamily: 'monospace', fontSize: 12,
-            }}>
-              {script}
+            <div style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.9, whiteSpace: 'pre-wrap', fontFamily: 'Georgia, "Times New Roman", serif' }}>
+              {formatScriptForDisplay(script)}
             </div>
           </div>
 
-          <div style={{
-            background: 'var(--bg-card)', border: '1px solid var(--border)',
-            borderRadius: 14, padding: '14px 16px',
-          }}>
-            {audioError && (
-              <div style={{
-                fontSize: 12, color: '#f87171',
-                background: 'rgba(220,38,38,0.08)',
-                border: '1px solid rgba(220,38,38,0.2)',
-                borderRadius: 8, padding: '10px 12px',
-                lineHeight: 1.5,
-              }}>
-                <div style={{ fontWeight: 700, marginBottom: 4 }}>Audio generation failed</div>
-                <div style={{ fontSize: 11 }}>{audioError}</div>
-                <button 
-                  onClick={() => generateAndNarrate(genre.id)}
+          /* Audio/Control Column */
+          <div style={{ position: 'sticky', top: 20 }}>
+            {!audioDataUri ? (
+              <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 16, padding: '20px' }}>
+                <button onClick={narrate} disabled={audioLoading}
                   style={{
-                    marginTop: 8, fontSize: 11, color: 'var(--text-2)',
-                    background: 'var(--bg-elevated)', border: '1px solid var(--border)',
-                    borderRadius: 6, padding: '4px 8px', cursor: 'pointer'
-                  }}
-                >
-                  Retry Cast Recording
+                    width: '100%', background: audioLoading ? 'var(--bg-elevated)' : `linear-gradient(135deg, ${genre?.color}, ${genre?.color}cc)`,
+                    color: audioLoading ? 'var(--text-3)' : '#fff', border: 'none', borderRadius: 12, padding: '14px 20px', fontSize: 14, fontWeight: 700,
+                    cursor: audioLoading ? 'not-allowed' : 'pointer', boxShadow: audioLoading ? 'none' : `0 4px 16px ${genre?.color}44`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, transition: 'all 0.2s',
+                  }}>
+                  {audioLoading ? <><span className="spinner" /> {audioStatus || 'Connecting...'}</> : <>🎙️ Narrate with Deepgram Aura-2</>}
                 </button>
+                <p style={{ fontSize: 10, color: 'var(--text-3)', textAlign: 'center', marginTop: 10, lineHeight: 1.4 }}>
+                  Multi-voice cast · Dramatic prose cleaner active · Atmospheric mixing
+                </p>
+                {audioError && <div style={{ fontSize: 11, color: '#f87171', background: 'rgba(220,38,38,0.08)', borderRadius: 8, padding: '8px 12px', marginTop: 12 }}>{audioError}</div>}
               </div>
-            )}
-
-            {audioDataUri && (
-              <div style={{ marginTop: audioError ? 12 : 0 }}>
-                <audio
-                  ref={audioRef}
-                  src={audioDataUri}
-                  onPlay={() => setIsPlaying(true)}
-                  onPause={() => setIsPlaying(false)}
-                  onEnded={() => {
-                    setIsPlaying(false)
-                    bgSoundRef.current?.stop()
-                  }}
-                  style={{ display: 'none' }}
-                />
-
-                <div style={{
-                  background: 'var(--bg-elevated)',
-                  border: `1px solid ${genre?.color ?? 'var(--border)'}33`,
-                  borderRadius: 12, padding: '12px 14px',
-                  display: 'flex', alignItems: 'center', gap: 12,
-                }}>
-                  <button
-                    onClick={togglePlay}
+            ) : (
+              <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 16, padding: '20px' }}>
+                <audio ref={audioRef} src={audioDataUri} onEnded={() => { setIsPlaying(false); bgSoundRef.current?.stop() }} style={{ display: 'none' }} />
+                
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+                  <button onClick={togglePlay}
                     style={{
-                      width: 44, height: 44, borderRadius: '50%',
-                      background: `linear-gradient(135deg, ${genre?.color}, ${genre?.color}cc)`,
-                      border: 'none', cursor: 'pointer', flexShrink: 0,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: 18, color: '#fff',
-                      boxShadow: `0 2px 12px ${genre?.color}55`,
-                    }}
-                  >
-                    {isPlaying ? '⏸' : '▶'}
-                  </button>
-
+                      width: 54, height: 54, borderRadius: '50%', background: `linear-gradient(135deg, ${genre?.color}, ${genre?.color}cc)`,
+                      border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, color: '#fff',
+                      boxShadow: `0 4px 20px ${genre?.color}66`,
+                    }}>{isPlaying ? '⏸' : '▶'}</button>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginBottom: 2 }}>
-                       Cinematic Match Narration
-                    </div>
-                    <div style={{ fontSize: 10, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                       Aura-2 Multi-Voice
-                       {isPlaying && (
-                         <span style={{ color: genre?.color, display: 'flex', alignItems: 'center', gap: 4 }}>
-                           <span className="pulse" style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor' }} />
-                           Now Playing
-                         </span>
-                       )}
-                    </div>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--text)' }}>Now Playing</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-3)' }}>Cast: {voicesInfo.length} voices active</div>
                   </div>
-
-                  <button
-                    onClick={() => {
-                      const link = document.createElement('a')
-                      link.href = audioDataUri
-                      link.download = `kickoffto-${genre?.id}-cinematic.mp3`
-                      link.click()
-                    }}
-                    style={{
-                      background: 'var(--bg-card)',
-                      border: '1px solid var(--border)',
-                      borderRadius: 8, padding: '6px 10px',
-                      fontSize: 11, color: 'var(--text-2)',
-                      cursor: 'pointer', flexShrink: 0,
-                    }}
-                  >
-                    ↓ MP3
-                  </button>
                 </div>
 
-                <div style={{ marginTop: 8, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                  <button
-                    onClick={() => {
-                      const newState = !bgEnabled
-                      setBgEnabled(newState)
-                      if (isPlaying) {
-                        if (newState) {
-                          const bg = createBackgroundSound(audioCtxRef.current!, selectedGenre!)
-                          bgSoundRef.current = bg
-                          bg.start()
-                        } else {
-                          bgSoundRef.current?.stop()
-                        }
-                      }
-                    }}
-                    style={{
-                      background: bgEnabled ? 'rgba(34,197,94,0.1)' : 'var(--bg-elevated)',
-                      border: `1px solid ${bgEnabled ? 'var(--green)' : 'var(--border)'}`,
-                      borderRadius: 8, padding: '5px 10px',
-                      fontSize: 11, color: bgEnabled ? 'var(--green)' : 'var(--text-3)',
-                      cursor: 'pointer', fontWeight: 600,
-                    }}
-                  >
-                    🎵 {bgEnabled ? 'Atmosphere ON' : 'Atmosphere OFF'}
-                  </button>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
+                  {voicesInfo.map(v => <span key={v} style={{ fontSize: 9, background: 'var(--bg-elevated)', borderRadius: 4, padding: '2px 6px', color: 'var(--text-3)' }}>{v}</span>)}
+                </div>
 
-                  {voicesInfo.length > 0 && (
-                    <div style={{ fontSize: 9, color: 'var(--text-3)', display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                      {voicesInfo.slice(0, 4).map(v => (
-                        <span key={v} style={{
-                          background: 'var(--bg-elevated)', borderRadius: 4, padding: '2px 6px',
-                        }}>
-                          {v}
-                        </span>
-                      ))}
-                    </div>
-                  )}
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={() => { setBgEnabled(e => !e); if (isPlaying) { if (!bgEnabled) createBackgroundSound(audioCtxRef.current!, selectedGenre!).start(); else bgSoundRef.current?.stop(); } }}
+                    style={{ flex: 1, background: bgEnabled ? 'rgba(34,197,94,0.1)' : 'var(--bg-elevated)', border: `1px solid ${bgEnabled ? 'var(--green)' : 'var(--border)'}`, borderRadius: 10, padding: '8px', fontSize: 11, color: bgEnabled ? 'var(--green)' : 'var(--text-3)', cursor: 'pointer', fontWeight: 600 }}>
+                    🎵 BG {bgEnabled ? 'ON' : 'OFF'}
+                  </button>
+                  <button onClick={() => { const link = document.createElement('a'); link.href = audioDataUri; link.download = 'match-drama.mp3'; link.click(); }}
+                    style={{ flex: 1, background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 10, padding: '8px', fontSize: 11, color: 'var(--text-2)', cursor: 'pointer' }}>
+                    ↓ Download
+                  </button>
                 </div>
               </div>
             )}
           </div>
         </div>
       )}
-      
+
       <style jsx>{`
-        @keyframes typingBounce {
-          0%, 80%, 100% { transform: translateY(0); opacity: 0.3; }
-          40% { transform: translateY(-8px); opacity: 1; }
-        }
-        .pulse {
-          animation: pulseFade 1.5s ease-in-out infinite;
-        }
-        @keyframes pulseFade {
-          0% { opacity: 0.3; }
-          50% { opacity: 1; }
-          100% { opacity: 0.3; }
-        }
+        @keyframes typingBounce { 0%, 80%, 100% { transform: translateY(0); opacity: 0.3; } 40% { transform: translateY(-8px); opacity: 1; } }
+        .spinner { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.3); border-top: 2px solid #fff; borderRadius: 50%; animation: spin 0.8s linear infinite; }
+        @keyframes spin { from { transform: rotate(0); } to { transform: rotate(360deg); } }
+        @media (max-width: 640px) { .desktop-split { grid-template-columns: 1fr !important; } }
       `}</style>
     </div>
   )
